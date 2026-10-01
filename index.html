@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f7f7f1" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'" />
+  <meta http-equiv="Permissions-Policy" content="geolocation=(), camera=(), microphone=(), payment=(), usb=()" />
+  <title>Fieldnote — grow where you are</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="Fieldnote home"><span class="brand-mark">✳</span><span>fieldnote<span class="brand-period">.</span></span></a>
+      <div class="side-label">YOUR GARDEN</div>
+      <nav class="side-nav" aria-label="Main navigation">
+        <a class="nav-item active" href="#discover"><span class="nav-icon">⌕</span> Discover</a>
+        <a class="nav-item" href="#plants"><span class="nav-icon">♧</span> My plants <span class="nav-count">4</span></a>
+        <a class="nav-item" href="#journal"><span class="nav-icon">▤</span> Garden journal</a>
+      </nav>
+      <div class="side-divider"></div>
+      <div class="side-label">YOUR SPACE</div>
+      <button class="location-card" id="sidebarLocation"><span class="pin">⌖</span><span><strong id="sidebarPlace">Your garden</strong><small id="sidebarClimate">Set your location</small></span><span class="chevron">›</span></button>
+      <div class="sidebar-bottom">
+        <div class="tip-card"><span class="tip-spark">✳</span><p>Good gardens start with a little observation.</p><small>FIELDNOTE TIP · 01</small></div>
+        <div class="profile"><div class="avatar">G</div><div><strong>Green thumb</strong><small>Home gardener</small></div><span class="more">···</span></div>
+      </div>
+    </aside>
+
+    <main id="discover" class="main-content">
+      <header class="topbar"><div class="breadcrumb">Your garden <span>/</span> <strong>Discover</strong></div><div class="top-actions"><span class="season-pill"><i></i> Early autumn</span><button class="icon-button" aria-label="Notifications">♧<b></b></button></div></header>
+      <section class="welcome"><div><div class="eyebrow"><span></span> A GARDEN THAT GETS YOU</div><h1>Grow where<br>you <em>are.</em></h1><p class="welcome-copy">Every great garden starts with noticing. Show us your space and we’ll find the plants that belong there.</p><button class="text-link" id="howItWorks">How it works <span>↗</span></button></div>
+        <div class="hero-art" aria-label="Illustration of a thriving garden"><div class="sun"></div><div class="hill hill-back"></div><div class="hill hill-front"></div><div class="art-label"><span>✳</span> A LITTLE MORE WILD</div><div class="flower f1">✿</div><div class="flower f2">✿</div><div class="flower f3">✿</div><div class="plant-stem s1"><i></i><b></b></div><div class="plant-stem s2"><i></i><b></b></div><div class="plant-stem s3"><i></i><b></b></div><div class="plant-stem s4"><i></i><b></b></div><div class="hero-caption">Made for your patch of earth.</div></div>
+      </section>
+
+      <section class="workspace" aria-label="Garden discovery">
+        <div class="section-heading"><div><div class="eyebrow muted">LET’S TAKE A LOOK</div><h2>Tell us about your space</h2></div><span class="step-count">01 <i>—</i> 02</span></div>
+        <div class="input-grid">
+          <div class="upload-card" id="dropZone"><input type="file" id="photoInput" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" hidden><div class="upload-empty" id="uploadEmpty"><div class="camera-icon">⌑</div><strong>Start with a photo</strong><p>Show us the light, the soil, the little corners.<br>We’ll look for clues in your space.</p><button class="button dark" id="choosePhoto"><span>＋</span> Choose a photo</button><small>OR DROP PHOTOS HERE · JPG, PNG, WEBP</small></div><div id="photoPreview" class="photo-preview hidden"><img id="previewImg" alt="Your garden photo"><div class="photo-overlay"><span class="photo-tag">YOUR SPACE</span><button id="changePhoto" class="change-photo">Change photo</button></div><div class="photo-caption"><span class="scan-dot"></span><span id="photoName">Garden photo</span><span class="clue-separator">·</span><span id="photoClue">Reading photo clues…</span></div></div></div>
+          <div class="details-card"><div class="field-label">WHERE ARE YOU GROWING?</div><div class="location-input"><span class="location-symbol">⌖</span><input id="locationInput" type="text" placeholder="City, state, or ZIP code" autocomplete="off"><span class="locate-button local-lock" title="Location stays on this device" aria-label="Location stays on this device">LOCAL</span></div><div class="location-hint" id="locationHint">Optional. We match broad regions on this device.</div>
+            <div class="field-label goal-label">WHAT WOULD YOU LOVE TO GROW?</div><div class="goal-options" role="group" aria-label="Garden goals"><button class="goal-chip selected" data-goal="all"><span>✳</span> A little of everything</button><button class="goal-chip" data-goal="fruit"><span>◉</span> Fruits &amp; food</button><button class="goal-chip" data-goal="flowers"><span>❀</span> Flowers &amp; pollinators</button><button class="goal-chip" data-goal="privacy"><span>↟</span> Privacy &amp; screening</button></div>
+            <button class="button primary" id="findPlants"><span>✳</span> Find my plants <b>→</b></button><div class="privacy-note"><span>♧</span> Photos stay on this device · no image upload</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="results" id="plants"><div class="section-heading results-heading"><div><div class="eyebrow muted">A FEW GOOD PLACES TO START</div><h2>Plants for your patch</h2></div><button class="filter-button" id="filterLabel">✳ <span>All goals</span>⌄</button></div><div class="results-subtitle" id="resultsSubtitle">A thoughtfully chosen mix for your garden. Add a location to make these recommendations local.</div>
+        <div class="plant-grid" id="plantGrid"></div>
+        <div class="visualize-callout"><div class="visualize-icon">✳</div><div class="visualize-copy"><strong>Picture your garden in bloom</strong><span>Place these plant ideas in your photo and see an illustrated growth timeline.</span></div><button class="button visualize-button" id="visualizeButton">Visualize in my garden <b>→</b></button></div>
+        <button class="view-all" id="viewAll">Explore all plant ideas <span>→</span></button>
+      </section>
+      <section class="visualizer hidden" id="visualizer" aria-label="Garden growth preview"><div class="section-heading"><div><div class="eyebrow muted">A POSSIBLE FUTURE</div><h2>Your garden, growing</h2></div><button class="close-visualizer" id="closeVisualizer" aria-label="Close garden preview">×</button></div><p class="visualizer-intro">Plant placement uses green and soil-like color cues to estimate a ground line and open planting spots. Plant height and growth differ by species; scale is approximate because the photo has no depth reference.</p><div class="visualizer-layout"><div class="garden-scene" id="gardenScene"><canvas id="gardenCanvas" role="img" aria-label="Illustrated garden plan based on your photo"></canvas></div><div class="growth-panel"><div class="growth-label">GROWTH TIMELINE</div><div class="growth-year" id="growthYear">Today</div><p class="growth-description" id="growthDescription">Your space today, before the new planting.</p><input type="range" id="growthSlider" min="0" max="3" step="1" value="0" aria-label="Garden growth stage"><div class="growth-ticks"><button class="growth-tick active" data-stage="0">Now</button><button class="growth-tick" data-stage="1">1 year</button><button class="growth-tick" data-stage="2">3 years</button><button class="growth-tick" data-stage="3">5 years</button></div><div class="timeline-note"><span>✳</span><span>Growth is an illustration. Real timing depends on species, site, and care.</span></div><button class="button dark download-button" id="downloadVisual">↓ Save garden concept</button></div></div><div class="included-plants" id="includedPlants"></div></section>
+      <footer class="footer"><span class="brand-mark">✳</span> Growing a little more connected. <span class="footer-right">PLANTS, PLACE &amp; POSSIBILITY</span></footer>
+    </main>
+  </div>
+  <div class="drop-overlay" id="dropOverlay" aria-hidden="true"><div class="drop-overlay-card"><span>＋</span><strong>Drop your garden photo</strong><small>Release to add it to your space</small></div></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <dialog id="infoDialog"><div class="dialog-inner"><button class="dialog-close" id="closeDialog" aria-label="Close">×</button><div class="eyebrow muted">A SMALL NOTE</div><h2>Good advice starts with context.</h2><p>Your photo, location, and garden plan are handled in this browser. Photos are not uploaded or saved by Fieldnote. Fieldnote does not request device location or send your data to a server; anything you type is used only for on-device regional matching.</p><p>The photo scan estimates image brightness and green color. It’s only a rough cue, since photo exposure can’t tell us how much sun a planting spot gets. Recommendations are a starting point; check your spot and local planting guidance before planting. Saved concepts are created on this device when you choose to download them.</p><button class="button dark" id="gotIt">Got it</button></div></dialog>
+  <script src="app.js"></script>
+</body>
+</html>
