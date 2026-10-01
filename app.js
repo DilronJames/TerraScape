@@ -13,6 +13,20 @@ const regionAliases = {Northeast:['new england','maine','vermont','new hampshire
 const state={goal:'all',location:'',region:'',photo:false,photoUrl:'',lightClue:'',stage:0,sceneAnalysis:null,visualRender:0};
 const plantTraits={berry:{heightFt:6,establishYears:7},strawberry:{heightFt:.7,establishYears:2},blueberry:{heightFt:5,establishYears:6},coneflower:{heightFt:4,establishYears:2},susan:{heightFt:2.5,establishYears:2},bergamot:{heightFt:4,establishYears:2},inkberry:{heightFt:7,establishYears:8},cedar:{heightFt:14,establishYears:12},arborvitae:{heightFt:12,establishYears:10}};
 const sceneAspect=1.6;
+
+/* ------------------------------------------------------------------
+   PLANT IMAGE LIBRARY
+   Files live at assets/plants/<icon>/<stage>-<n>.webp
+   stage = young | mid | mature, n starts at 0.
+   Counts below = how many variants exist per stage. Add an entry as you
+   finish each species; anything missing falls back to the SVG drawing.
+------------------------------------------------------------------ */
+const plantAssets = {
+  // Example (uncomment once the files exist):
+  // coneflower:{young:2, mid:1, mature:2},
+  // susan:{young:2, mid:1, mature:2},
+};
+
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const supportedImageTypes=new Set(['image/jpeg','image/png','image/webp']);
 const isSupportedImage=file=>Boolean(file&&supportedImageTypes.has(file.type.toLowerCase()));
@@ -48,19 +62,195 @@ function plantPortrait(type){
 function getPlants(){let list=plants.filter(p=>state.goal==='all'||p.goal===state.goal);if(state.region){const local=list.filter(p=>p.regions.includes(state.region));if(local.length)list=local;else list=list.slice(0,6)}if(state.lightClue==='shadier')list.sort((a,b)=>Number(b.light==='Sun to part shade')-Number(a.light==='Sun to part shade'));return list.slice(0,6)}
 function render(){const list=getPlants();$('#plantGrid').innerHTML=list.map(p=>`<article class="plant-card"><div class="plant-art">${plantArt(p.icon)}<span class="sun-pill">☼ ${p.light}</span></div><div class="plant-info"><div class="plant-kind">${p.kind}</div><div class="plant-name">${p.name}</div><div class="plant-desc">${p.desc}</div><div class="plant-meta"><span>♧ ${p.water}</span><span>${p.latin}</span></div></div></article>`).join('');const labels={all:'All goals',fruit:'Fruits & food',flowers:'Flowers & pollinators',privacy:'Privacy & screening'};$('#filterLabel span').textContent=labels[state.goal];$('#resultsSubtitle').textContent=state.region?`A first look at plants suited to the ${state.region}${state.photo?` and your ${state.lightClue==='shadier'?'darker':'brighter'} photo` :''}. Check sun, soil, and local planting guidance before you choose.`:'A thoughtfully chosen mix for your garden. Add a location to make these recommendations local.';if(!list.length)$('#plantGrid').innerHTML='<p>No suggestions for that goal yet. Try another goal.</p>';if(!$('#visualizer').classList.contains('hidden'))renderVisualizer()}
 const growthStages=[{name:'Today',badge:'TODAY',years:0,description:'New planting day. Small starts settle into the spots estimated from your photo.'},{name:'1 year',badge:'AFTER 1 YEAR',years:1,description:'Fast-growing perennials fill in first; slower shrubs establish at their own pace.'},{name:'3 years',badge:'AFTER 3 YEARS',years:3,description:'Perennials approach mature size while fruiting and screening shrubs continue to fill out.'},{name:'5 years',badge:'AFTER 5 YEARS',years:5,description:'A more established layout, with each plant scaled by its typical mature height.'}];
-const portraitCache=new Map();
-function imageForPlant(type){if(!portraitCache.has(type)){portraitCache.set(type,loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(plantPortrait(type))}`))}return portraitCache.get(type)}
+
+/* ------------------------------------------------------------------
+   IMAGE LOADING (real cutouts first, SVG fallback)
+------------------------------------------------------------------ */
+function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=src})}
+const imgCache=new Map();
+function svgFallback(icon){
+  const svg=plantPortrait(icon).replace('<svg ','<svg width="840" height="1000" ');
+  return loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+}
+function pickStage(icon,stageKey){
+  const counts=plantAssets[icon];if(!counts)return null;
+  for(const key of [stageKey,'mature','mid','young'])if(counts[key]>0)return key;
+  return null;
+}
+function imageForPlant(icon,stageKey='mature',variant=0){
+  const usable=pickStage(icon,stageKey);
+  const count=usable?plantAssets[icon][usable]:0;
+  const key=usable?`${icon}|${usable}|${variant%count}`:`${icon}|svg`;
+  if(!imgCache.has(key)){
+    const p=usable
+      ?loadImage(`assets/plants/${icon}/${usable}-${variant%count}.webp`).catch(()=>svgFallback(icon))
+      :svgFallback(icon);
+    imgCache.set(key,p);
+  }
+  return imgCache.get(key);
+}
+
+/* ------------------------------------------------------------------
+   PHOTO ANALYSIS
+------------------------------------------------------------------ */
 function drawPhotoCover(ctx,image,width,height){const target=width/height,imageAspect=image.naturalWidth/image.naturalHeight;let sx=0,sy=0,sw=image.naturalWidth,sh=image.naturalHeight;if(imageAspect>target){sw=image.naturalHeight*target;sx=(image.naturalWidth-sw)/2}else{sh=image.naturalWidth/target;sy=(image.naturalHeight-sh)/2}ctx.drawImage(image,sx,sy,sw,sh,0,0,width,height)}
 function groundPixelScore(r,g,b){if(g>55&&g>r*1.08&&g>b*1.04)return 1;if(r>72&&r>g*1.08&&g>b*1.04&&b<175)return .55;return 0}
-function analyzeGardenPhoto(image){const width=160,height=100,sample=document.createElement('canvas');sample.width=width;sample.height=height;const ctx=sample.getContext('2d',{willReadFrequently:true});if(!ctx)return{groundTop:.62,confidence:0,columns:[]};drawPhotoCover(ctx,image,width,height);const pixels=ctx.getImageData(0,0,width,height).data,rowScore=new Array(height).fill(0);let greens=0,total=width*height,brightness=0;for(let y=0;y<height;y++){let score=0;for(let x=0;x<width;x++){const i=(y*width+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2];score+=groundPixelScore(r,g,b);if(g>r*1.08&&g>b*1.04&&g>55)greens++;brightness+=(.2126*r+.7152*g+.0722*b)/255}rowScore[y]=score/width}let groundTop=.62,confidence=0;for(let y=30;y<83;y++){const band=(rowScore[y]+rowScore[y+1]+rowScore[y+2]+rowScore[y+3]+rowScore[y+4])/5;if(band>.19){groundTop=y/height;confidence=band;break}}const columns=[];for(let x=8;x<width-8;x+=3){let score=0,count=0;const from=Math.max(38,Math.floor(groundTop*height)-3);for(let y=from;y<97;y++){for(let dx=-4;dx<=4;dx++){const i=(y*width+x+dx)*4;score+=groundPixelScore(pixels[i],pixels[i+1],pixels[i+2]);count++}}let localTop=groundTop;for(let y=Math.max(30,Math.floor(groundTop*height)-5);y<83;y++){let band=0,bandCount=0;for(let dy=0;dy<4;dy++)for(let dx=-4;dx<=4;dx++){const i=((y+dy)*width+x+dx)*4;band+=groundPixelScore(pixels[i],pixels[i+1],pixels[i+2]);bandCount++}if(band/bandCount>.28){localTop=y/height;break}}columns.push({x:x/width,score:count?score/count:0,groundY:localTop})}return{groundTop,confidence,columns,brightness:brightness/total,greenRatio:greens/total}}
+const DEFAULT_TINT={r:120,g:130,b:100}, DEFAULT_SKEW=.35;
+function analyzeGardenPhoto(image){
+  const width=160,height=100,sample=document.createElement('canvas');sample.width=width;sample.height=height;
+  const ctx=sample.getContext('2d',{willReadFrequently:true});
+  if(!ctx)return{groundTop:.62,confidence:0,columns:[],tint:DEFAULT_TINT,skew:DEFAULT_SKEW};
+  drawPhotoCover(ctx,image,width,height);
+  const pixels=ctx.getImageData(0,0,width,height).data,rowScore=new Array(height).fill(0);
+  let greens=0,total=width*height,brightness=0,sr=0,sg=0,sb=0,leftB=0,rightB=0;
+  for(let y=0;y<height;y++){
+    let score=0;
+    for(let x=0;x<width;x++){
+      const i=(y*width+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2];
+      score+=groundPixelScore(r,g,b);
+      if(g>r*1.08&&g>b*1.04&&g>55)greens++;
+      const lum=(.2126*r+.7152*g+.0722*b)/255;
+      brightness+=lum;
+      sr+=r;sg+=g;sb+=b;
+      if(x<width/2)leftB+=lum;else rightB+=lum;
+    }
+    rowScore[y]=score/width;
+  }
+  let groundTop=.62,confidence=0;
+  for(let y=30;y<83;y++){const band=(rowScore[y]+rowScore[y+1]+rowScore[y+2]+rowScore[y+3]+rowScore[y+4])/5;if(band>.19){groundTop=y/height;confidence=band;break}}
+  const columns=[];
+  for(let x=8;x<width-8;x+=3){
+    let score=0,count=0;const from=Math.max(38,Math.floor(groundTop*height)-3);
+    for(let y=from;y<97;y++){for(let dx=-4;dx<=4;dx++){const i=(y*width+x+dx)*4;score+=groundPixelScore(pixels[i],pixels[i+1],pixels[i+2]);count++}}
+    let localTop=groundTop;
+    for(let y=Math.max(30,Math.floor(groundTop*height)-5);y<83;y++){let band=0,bandCount=0;for(let dy=0;dy<4;dy++)for(let dx=-4;dx<=4;dx++){const i=((y+dy)*width+x+dx)*4;band+=groundPixelScore(pixels[i],pixels[i+1],pixels[i+2]);bandCount++}if(band/bandCount>.28){localTop=y/height;break}}
+    columns.push({x:x/width,score:count?score/count:0,groundY:localTop});
+  }
+  // Light direction: brighter side of the photo = where light comes from, so shadows fall the other way.
+  const rawSkew=clamp((rightB-leftB)/(total/2)*3,-.9,.9);
+  const skew=Math.abs(rawSkew)<.15?DEFAULT_SKEW:rawSkew;
+  return{
+    groundTop,confidence,columns,
+    brightness:brightness/total,greenRatio:greens/total,
+    tint:{r:Math.round(sr/total),g:Math.round(sg/total),b:Math.round(sb/total)},
+    skew
+  };
+}
 function clamp(value,min,max){return Math.max(min,Math.min(max,value))}
 function photoAwareLayout(list,analysis){const count=list.length;if(!count)return[];const columns=analysis?.columns||[],groundTop=analysis?.groundTop??.62,chosen=[];for(let index=0;index<count;index++){const target=(index+1)/(count+1);let best={x:target,score:-Infinity,groundY:groundTop};for(const candidate of columns){if(candidate.x<target-.15||candidate.x>target+.15)continue;if(chosen.some(item=>Math.abs(item.x-candidate.x)<.145))continue;const score=candidate.score*.8-Math.abs(candidate.x-target)*.7;if(score>best.score)best={x:candidate.x,score,groundY:candidate.groundY}}const x=clamp(best.x,.1,.9),nearby=columns.filter(c=>Math.abs(c.x-x)<.07),localQuality=nearby.length?nearby.reduce((sum,c)=>sum+c.score,0)/nearby.length:0,baseY=clamp(best.groundY+.27+(localQuality<.06?.02:0),.73,.96);chosen.push({x,y:baseY,quality:localQuality,index})}return chosen}
 function growthFactor(plant,stage){const trait=plantTraits[plant.icon]||{establishYears:5};const rate=2.3/trait.establishYears,years=growthStages[stage].years;return .08+.92*(1-Math.exp(-rate*years))}
+function stageKeyFor(factor){return factor<.3?'young':factor<.65?'mid':'mature'}
+
+/* ------------------------------------------------------------------
+   SCENE BUILDING + DRAWING
+------------------------------------------------------------------ */
+function mulberry32(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+// Seeded so the layout never reshuffles between slider moves, re-renders, or exports.
+function buildInstances(list,analysis,seed=42){
+  const anchors=photoAwareLayout(list,analysis),out=[];
+  anchors.forEach(a=>{
+    const plant=list[a.index],trait=plantTraits[plant.icon]||{heightFt:4};
+    const rand=mulberry32(seed+a.index*101);
+    const n=trait.heightFt>10?1:trait.heightFt>6?2:trait.heightFt<1?6:4;
+    for(let i=0;i<n;i++){
+      out.push({
+        plant,
+        x:clamp(a.x+(rand()-.5)*.10,.06,.94),
+        y:clamp(a.y+(rand()-.5)*.04,.70,.97),
+        scale:.85+rand()*.30,
+        flip:rand()>.5,
+        variant:Math.floor(rand()*10)
+      });
+    }
+  });
+  return out.sort((a,b)=>a.y-b.y); // back to front
+}
+
+async function prepareScene(list,stage,analysis){
+  const instances=buildInstances(list,analysis);
+  const imgs=await Promise.all(instances.map(it=>{
+    const f=growthFactor(it.plant,stage);
+    return imageForPlant(it.plant.icon,stageKeyFor(f),it.variant);
+  }));
+  return{instances,imgs};
+}
+
+function drawPlantInstance(ctx,img,x,baseY,w,h,flip,scene){
+  const cw=Math.max(1,Math.ceil(w)),ch=Math.max(1,Math.ceil(h));
+
+  // tone-matched copy of the plant
+  const tinted=document.createElement('canvas');tinted.width=cw;tinted.height=ch;
+  const t=tinted.getContext('2d');
+  t.imageSmoothingEnabled=true;t.imageSmoothingQuality='high';
+  t.drawImage(img,0,0,cw,ch);
+  t.globalCompositeOperation='source-atop';
+  const {r,g,b}=scene.tint;
+  t.fillStyle=`rgba(${r},${g},${b},.13)`;t.fillRect(0,0,cw,ch);
+
+  // dark silhouette for the cast shadow
+  const sil=document.createElement('canvas');sil.width=cw;sil.height=ch;
+  const s=sil.getContext('2d');
+  s.drawImage(img,0,0,cw,ch);
+  s.globalCompositeOperation='source-atop';
+  s.fillStyle='#10190c';s.fillRect(0,0,cw,ch);
+
+  ctx.save();
+  ctx.translate(x,baseY);
+  if(flip)ctx.scale(-1,1);
+
+  // contact shadow
+  const cs=ctx.createRadialGradient(0,0,0,0,0,w*.35);
+  cs.addColorStop(0,'rgba(15,25,10,.35)');cs.addColorStop(1,'rgba(15,25,10,0)');
+  ctx.save();ctx.scale(1,.25);ctx.fillStyle=cs;
+  ctx.beginPath();ctx.arc(0,0,w*.35,0,Math.PI*2);ctx.fill();ctx.restore();
+
+  // cast shadow: flattened and skewed away from the light
+  ctx.save();
+  ctx.transform(1,0,flip?-scene.skew:scene.skew,.22,0,0);
+  ctx.globalAlpha=.26;
+  if('filter' in ctx)ctx.filter=`blur(${Math.max(2,w/120)}px)`;
+  ctx.drawImage(sil,-w/2,-h,w,h);
+  ctx.restore();
+
+  // the plant itself, base sitting on the ground point
+  ctx.drawImage(tinted,-w/2,-h,w,h);
+  ctx.restore();
+}
+
 function drawPlanBadges(ctx,width,height,stage){const scale=width/1200;ctx.save();ctx.font=`600 ${12*scale}px Arial, sans-serif`;const top=18*scale,left=18*scale;ctx.fillStyle='#ffffffdf';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(left,top,178*scale,26*scale,13*scale);else ctx.rect(left,top,178*scale,26*scale);ctx.fill();ctx.fillStyle='#4e634a';ctx.fillText('FIELDNOTE  ·  GARDEN PLAN',left+12*scale,top+17*scale);const label=growthStages[stage].badge;const labelWidth=ctx.measureText(label).width+22*scale;ctx.fillStyle='#ffffffdf';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(width-left-labelWidth,top,labelWidth,26*scale,13*scale);else ctx.rect(width-left-labelWidth,top,labelWidth,26*scale);ctx.fill();ctx.fillStyle='#627557';ctx.fillText(label,width-left-labelWidth+11*scale,top+17*scale);ctx.restore()}
-function paintGardenPlan(ctx,width,height,photo,list,stage,analysis,portraits){drawPhotoCover(ctx,photo,width,height);const shade=ctx.createLinearGradient(0,0,0,height);shade.addColorStop(0,'rgba(26,51,33,.10)');shade.addColorStop(.4,'rgba(26,51,33,0)');shade.addColorStop(1,'rgba(20,43,40,.12)');ctx.fillStyle=shade;ctx.fillRect(0,0,width,height);const placements=photoAwareLayout(list,analysis).map(point=>({plant:list[point.index],...point})).sort((a,b)=>a.y-b.y);for(const item of placements){const trait=plantTraits[item.plant.icon]||{heightFt:4};const perspective=.76+clamp((item.y-.62)/.32,0,1)*.26,plantHeight=height*Math.min(.58,.04+trait.heightFt*.035)*growthFactor(item.plant,stage)*perspective,plantWidth=plantHeight*210/250;ctx.drawImage(portraits[item.plant.icon],item.x*width-plantWidth/2,item.y*height-plantHeight,plantWidth,plantHeight)}drawPlanBadges(ctx,width,height,stage)}
-function renderGardenCanvas(){const canvas=$('#gardenCanvas'),ctx=canvas.getContext('2d');if(!ctx)return;const token=++state.visualRender,width=1200,height=Math.round(width/sceneAspect);canvas.width=width;canvas.height=height;const list=getPlants().slice(0,4);Promise.all([loadImage(state.photoUrl),...list.map(p=>imageForPlant(p.icon))]).then(([photo,...portraits])=>{if(token!==state.visualRender||state.photoUrl==='')return;paintGardenPlan(ctx,width,height,photo,list,state.stage,state.sceneAnalysis,Object.fromEntries(list.map((p,i)=>[p.icon,portraits[i]])));canvas.setAttribute('aria-label',`Illustrated garden plan, ${growthStages[state.stage].name}, including ${list.map(p=>p.name).join(', ')}`)}).catch(()=>{if(token===state.visualRender)showToast('Could not render the garden preview from this image.')})}
+
+function paintGardenPlan(ctx,width,height,photo,prep,stage,analysis){
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  drawPhotoCover(ctx,photo,width,height);
+  const shade=ctx.createLinearGradient(0,0,0,height);
+  shade.addColorStop(0,'rgba(26,51,33,.10)');shade.addColorStop(.4,'rgba(26,51,33,0)');shade.addColorStop(1,'rgba(20,43,40,.12)');
+  ctx.fillStyle=shade;ctx.fillRect(0,0,width,height);
+
+  const scene={tint:analysis?.tint||DEFAULT_TINT,skew:analysis?.skew??DEFAULT_SKEW};
+  prep.instances.forEach((it,i)=>{
+    const trait=plantTraits[it.plant.icon]||{heightFt:4},img=prep.imgs[i];
+    const persp=.76+clamp((it.y-.62)/.32,0,1)*.26;
+    const h=height*Math.min(.58,.04+trait.heightFt*.035)*growthFactor(it.plant,stage)*persp*it.scale;
+    const w=h*img.naturalWidth/img.naturalHeight; // real aspect ratio of the image
+    drawPlantInstance(ctx,img,it.x*width,it.y*height,w,h,it.flip,scene);
+  });
+  drawPlanBadges(ctx,width,height,stage);
+}
+
+function renderGardenCanvas(){
+  const canvas=$('#gardenCanvas'),ctx=canvas.getContext('2d');if(!ctx)return;
+  const token=++state.visualRender,width=1200,height=Math.round(width/sceneAspect);
+  canvas.width=width;canvas.height=height;
+  const list=getPlants().slice(0,4);
+  Promise.all([loadImage(state.photoUrl),prepareScene(list,state.stage,state.sceneAnalysis)]).then(([photo,prep])=>{
+    if(token!==state.visualRender||state.photoUrl==='')return;
+    paintGardenPlan(ctx,width,height,photo,prep,state.stage,state.sceneAnalysis);
+    canvas.setAttribute('aria-label',`Illustrated garden plan, ${growthStages[state.stage].name}, including ${list.map(p=>p.name).join(', ')}`);
+  }).catch(()=>{if(token===state.visualRender)showToast('Could not render the garden preview from this image.')});
+}
 function renderVisualizer(){const list=getPlants().slice(0,4),stage=growthStages[state.stage];$('#growthYear').textContent=stage.name;$('#growthDescription').textContent=stage.description;$('#growthSlider').value=state.stage;$$('.growth-tick').forEach(t=>t.classList.toggle('active',Number(t.dataset.stage)===state.stage));$('#includedPlants').innerHTML=list.map(p=>`<span class="included-plant"><span>✳</span>${p.name}</span>`).join('');renderGardenCanvas()}
-function inspectPhoto(img){try{const analysis=analyzeGardenPhoto(img);state.sceneAnalysis=analysis;state.lightClue=analysis.brightness<.37?'shadier':'brighter';$('#photoClue').textContent=`${state.lightClue==='shadier'?'Darker':'Brighter'} photo${analysis.greenRatio>.22?' · leafy color':''}`;render()}catch{state.sceneAnalysis={groundTop:.62,confidence:0,columns:[]};$('#photoClue').textContent='Photo added';state.lightClue='';render()}}
+function inspectPhoto(img){try{const analysis=analyzeGardenPhoto(img);state.sceneAnalysis=analysis;state.lightClue=analysis.brightness<.37?'shadier':'brighter';$('#photoClue').textContent=`${state.lightClue==='shadier'?'Darker':'Brighter'} photo${analysis.greenRatio>.22?' · leafy color':''}`;render()}catch{state.sceneAnalysis={groundTop:.62,confidence:0,columns:[],tint:DEFAULT_TINT,skew:DEFAULT_SKEW};$('#photoClue').textContent='Photo added';state.lightClue='';render()}}
 function setLocation(value,region=''){state.location=value;state.region=region||detectRegion(value);$('#locationInput').value=value;$('#sidebarPlace').textContent=value||'Your garden';$('#sidebarClimate').textContent=state.region?`${state.region} · regional plants`:value?'Location added':'Set your location';$('#locationHint').textContent=state.region?`Showing plants suited to the ${state.region}, matched on this device.`:value?'No regional match yet. Add a state or U.S. ZIP for broad matching.':'Optional. We match broad regions on this device.';render()}
 function handlePhoto(file){if(!isSupportedImage(file)){showToast('Choose a JPEG, PNG, or WebP photo.');return}if(file.size>25*1024*1024){showToast('That image is over 25 MB. Choose a smaller photo to keep processing smooth.');return}const url=URL.createObjectURL(file),img=$('#previewImg'),previousUrl=state.photoUrl,previousName=$('#photoName').textContent,previousClue=$('#photoClue').textContent;$('#photoClue').textContent='Reading photo clues…';img.onload=()=>{if(previousUrl&&previousUrl!==url)URL.revokeObjectURL(previousUrl);state.photoUrl=url;state.photo=true;state.sceneAnalysis=null;$('#photoName').textContent=file.name||'Pasted garden photo';$('#uploadEmpty').classList.add('hidden');$('#photoPreview').classList.remove('hidden');inspectPhoto(img);showToast('Photo added. Your garden preview is ready.')};img.onerror=()=>{URL.revokeObjectURL(url);img.onload=null;img.onerror=null;if(previousUrl){img.src=previousUrl;$('#photoName').textContent=previousName;$('#photoClue').textContent=previousClue;state.photo=true;showToast('That image could not be opened. Your previous photo is still in place.')}else{state.photo=false;state.photoUrl='';$('#photoPreview').classList.add('hidden');$('#uploadEmpty').classList.remove('hidden');$('#photoClue').textContent='';showToast('This image could not be opened. Try a JPEG, PNG, or WebP photo.')}};img.src=url}
 $('#choosePhoto').addEventListener('click',()=>$('#photoInput').click());$('#changePhoto').addEventListener('click',()=>$('#photoInput').click());$('#photoInput').addEventListener('change',e=>{handlePhoto(e.target.files[0]);e.target.value='' });
@@ -69,8 +259,27 @@ $$('.goal-chip').forEach(btn=>btn.addEventListener('click',()=>{$$('.goal-chip')
 $('#locationInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const value=e.currentTarget.value.trim();if(value)setLocation(value);e.currentTarget.blur()}});$('#locationInput').addEventListener('change',e=>{const value=e.target.value.trim();if(value)setLocation(value)});
 $('#findPlants').addEventListener('click',()=>{render();document.querySelector('.results').scrollIntoView({behavior:'smooth',block:'start'});if(!state.photo&&!state.location)showToast('Add a photo and location for ideas tailored to your space.');else if(!state.location)showToast('Add your location to see regionally suited plants.');else if(!state.photo)showToast('Add a photo to help you think through your space.');else showToast('Your garden ideas are ready below.')});
 $('#visualizeButton').addEventListener('click',()=>{if(!state.photo){showToast('Add a garden photo first to preview your planting plan.');$('#photoInput').click();return}$('#visualizer').classList.remove('hidden');renderVisualizer();$('#visualizer').scrollIntoView({behavior:'smooth',block:'start'})});$('#closeVisualizer').addEventListener('click',()=>$('#visualizer').classList.add('hidden'));$('#growthSlider').addEventListener('input',e=>{state.stage=Number(e.target.value);renderVisualizer()});$$('.growth-tick').forEach(t=>t.addEventListener('click',()=>{state.stage=Number(t.dataset.stage);renderVisualizer()}));
-function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=src})}
-$('#downloadVisual').addEventListener('click',async()=>{if(!state.photoUrl){showToast('Add a garden photo before saving a concept.');return}try{const photo=await loadImage(state.photoUrl),canvas=document.createElement('canvas');canvas.width=2400;canvas.height=Math.round(canvas.width/sceneAspect);const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas is unavailable');const list=getPlants().slice(0,4),portraits=await Promise.all(list.map(p=>imageForPlant(p.icon)));paintGardenPlan(ctx,canvas.width,canvas.height,photo,list,state.stage,state.sceneAnalysis,Object.fromEntries(list.map((p,i)=>[p.icon,portraits[i]])));canvas.toBlob(blob=>{if(!blob){showToast('Could not save this preview.');return}const imageUrl=URL.createObjectURL(blob),link=document.createElement('a');link.href=imageUrl;link.download=`fieldnote-garden-${state.stage===0?'today':state.stage===1?'year-1':state.stage===2?'year-3':'year-5'}.png`;link.click();setTimeout(()=>URL.revokeObjectURL(imageUrl),1000);showToast('Garden concept saved as an image.')},'image/png')}catch{showToast('Could not create the image. Try another garden photo.')}});
+
+$('#downloadVisual').addEventListener('click',async()=>{
+  if(!state.photoUrl){showToast('Add a garden photo before saving a concept.');return}
+  try{
+    const photo=await loadImage(state.photoUrl),canvas=document.createElement('canvas');
+    canvas.width=2400;canvas.height=Math.round(canvas.width/sceneAspect);
+    const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas is unavailable');
+    const list=getPlants().slice(0,4);
+    const prep=await prepareScene(list,state.stage,state.sceneAnalysis);
+    paintGardenPlan(ctx,canvas.width,canvas.height,photo,prep,state.stage,state.sceneAnalysis);
+    canvas.toBlob(blob=>{
+      if(!blob){showToast('Could not save this preview.');return}
+      const imageUrl=URL.createObjectURL(blob),link=document.createElement('a');
+      link.href=imageUrl;
+      link.download=`fieldnote-garden-${state.stage===0?'today':state.stage===1?'year-1':state.stage===2?'year-3':'year-5'}.png`;
+      link.click();
+      setTimeout(()=>URL.revokeObjectURL(imageUrl),1000);
+      showToast('Garden concept saved as an image.');
+    },'image/png');
+  }catch{showToast('Could not create the image. Try another garden photo.')}
+});
 window.addEventListener('pagehide',()=>{if(state.photoUrl)URL.revokeObjectURL(state.photoUrl)});
 $('#howItWorks').addEventListener('click',()=>$('#infoDialog').showModal());$('#closeDialog').addEventListener('click',()=>$('#infoDialog').close());$('#gotIt').addEventListener('click',()=>$('#infoDialog').close());$('#infoDialog').addEventListener('click',e=>{if(e.target===$('#infoDialog'))$('#infoDialog').close()});$('#sidebarLocation').addEventListener('click',()=>{$('#locationInput').focus();document.querySelector('.workspace').scrollIntoView({behavior:'smooth',block:'center'})});$('#viewAll').addEventListener('click',()=>showToast('More plant ideas are on their way. Start with these locally suited picks.'));
 render();
