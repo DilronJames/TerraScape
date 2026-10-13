@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#f5f7ee" />
   <meta name="referrer" content="no-referrer" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data: https://commons.wikimedia.org https://upload.wikimedia.org; font-src 'self'; connect-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: data:; font-src 'self'; connect-src 'none'; object-src 'none'; frame-src 'none'; worker-src 'none'; manifest-src 'none'; base-uri 'none'; form-action 'none'" />
   <meta http-equiv="Permissions-Policy" content="geolocation=(), camera=(), microphone=(), payment=(), usb=()" />
   <title>Fieldnote — grow where you are</title>
   <link rel="stylesheet" href="styles.css" />
@@ -84,7 +84,7 @@
         <span class="region-badge" id="regionBadge"><i></i> Parsippany · 07054</span>
       </div>
       <p class="results-subtitle" id="resultsSubtitle">Native Mid-Atlantic plants, matched to your goals and location.</p>
-      <div class="photo-source-note"><span>ⓘ</span> Real plant reference photos load from Wikimedia Commons. Your garden image stays local.</div>
+      <div class="photo-source-note"><span>ⓘ</span> Real plant photos are bundled with this demo; each card links to its photographer, original, and license.</div>
       <div class="plant-grid" id="plantGrid" aria-live="polite"></div>
       <div class="visualize-callout"><div class="visualize-icon">✳</div><div class="visualize-copy"><strong>Try these ideas in your own space</strong><span>Preview a planting layout with ground-aware placement, realistic proportions, and a species-specific growth timeline.</span></div><button class="button visualize-button" id="visualizeButton" type="button">Preview my garden <b>→</b></button></div>
     </section>
@@ -109,7 +109,7 @@
 
   <div class="drop-overlay" id="dropOverlay" aria-hidden="true"><div class="drop-overlay-card"><span>↥</span><strong>Drop your garden photo</strong><small>Release to add it to your space</small></div></div>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <dialog id="infoDialog"><div class="dialog-inner"><button class="dialog-close" id="closeDialog" type="button" aria-label="Close">×</button><div class="eyebrow muted">A SMALL NOTE ON PRIVACY</div><h2>Your garden stays yours.</h2><p>Fieldnote analyzes your garden photo in this browser. It is not uploaded or saved. We do not request device location or send your typed location to a server; ZIP matching happens on this device.</p><p>Plant reference photos are loaded from Wikimedia Commons. That image request shares standard connection information with Wikimedia, but does not include your garden photo or location.</p><p>Photo clues and native plant suggestions are a starting point, not a site survey. Check your sunlight, soil moisture, drainage, mature plant spacing, and local planting guidance before buying.</p><button class="button dark" id="gotIt" type="button">Got it</button></div></dialog>
+  <dialog id="infoDialog"><div class="dialog-inner"><button class="dialog-close" id="closeDialog" type="button" aria-label="Close">×</button><div class="eyebrow muted">A SMALL NOTE ON PRIVACY</div><h2>Your garden stays yours.</h2><p>Fieldnote analyzes your garden photo in this browser. It is not uploaded or saved. We do not request device location or send your typed location to a server; ZIP matching happens on this device.</p><p>Plant reference photos are bundled with the app. Their cards link to original Wikimedia Commons pages and licenses; no images or locations are requested from a server while you use the demo.</p><p>Photo clues and native plant suggestions are a starting point, not a site survey. Check your sunlight, soil moisture, drainage, mature plant spacing, and local planting guidance before buying.</p><button class="button dark" id="gotIt" type="button">Got it</button></div></dialog>
   <script src="app.js"></script>
 </body>
 </html>

@@ -132,6 +132,7 @@ main { width: min(1160px, calc(100% - 64px)); margin: 0 auto; }
 .plant-photo-credit { margin-top: 11px; color: #93a092; font-size: 8px; line-height: 1.5; }
 .plant-photo-credit a { color: #647d62; text-underline-offset: 2px; }
 .plant-photo-fallback { height: 100%; display: grid; place-items: center; color: #587751; font-size: 44px; }
+.plant-photo-fallback[hidden] { display: none; }
 .no-plants { grid-column: 1/-1; border: 1px dashed #cbd8c3; border-radius: 15px; padding: 35px; color: #647762; text-align: center; }
 .visualize-callout { margin-top: 20px; border: 1px solid #dce6d0; border-radius: 16px; padding: 16px; background: #eaf1dd; display: flex; align-items: center; gap: 13px; }
 .visualize-icon { flex: 0 0 39px; width: 39px; height: 39px; border-radius: 13px; display: grid; place-items: center; background: #d7e5c5; color: #618051; font-size: 22px; }

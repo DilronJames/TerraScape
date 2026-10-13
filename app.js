@@ -1,285 +1,847 @@
-const plants = [
-  {name:'Serviceberry', latin:'Amelanchier', kind:'Fruit · Native', goal:'fruit', light:'Sun to part shade', water:'Low water', icon:'berry', regions:['Northeast','Midwest','Southeast','Northwest','Mountain'], desc:'Spring blossoms, summer berries, and lovely fall color.'},
-  {name:'Wild strawberry', latin:'Fragaria virginiana', kind:'Fruit · Groundcover', goal:'fruit', light:'Sun to part shade', water:'Moderate water', icon:'strawberry', regions:['Northeast','Midwest','Southeast','Northwest','Mountain'], desc:'A sweet, low-growing edible that brings birds and pollinators.'},
-  {name:'Blueberry', latin:'Vaccinium', kind:'Fruit · Shrub', goal:'fruit', light:'Full sun', water:'Regular water', icon:'blueberry', regions:['Northeast','Midwest','Southeast','Northwest'], desc:'Spring flowers and summer fruit; likes naturally acidic soil.'},
-  {name:'Purple coneflower', latin:'Echinacea purpurea', kind:'Flower · Pollinator favorite', goal:'flowers', light:'Full sun', water:'Low water', icon:'coneflower', regions:['Northeast','Midwest','Southeast','Mountain'], desc:'A long-blooming native that keeps bees and butterflies busy.'},
-  {name:'Black-eyed Susan', latin:'Rudbeckia hirta', kind:'Flower · Easygoing', goal:'flowers', light:'Full sun', water:'Low water', icon:'susan', regions:['Northeast','Midwest','Southeast','Mountain'], desc:'Sunny golden blooms that handle heat and poorer soils.'},
-  {name:'Wild bergamot', latin:'Monarda fistulosa', kind:'Flower · Pollinator favorite', goal:'flowers', light:'Sun to part shade', water:'Low water', icon:'bergamot', regions:['Northeast','Midwest','Southeast','Northwest','Mountain'], desc:'Lavender blooms with a minty scent, loved by native bees.'},
-  {name:'Inkberry holly', latin:'Ilex glabra', kind:'Privacy · Evergreen', goal:'privacy', light:'Sun to part shade', water:'Moderate water', icon:'inkberry', regions:['Northeast','Southeast'], desc:'A tidy native evergreen hedge that stays leafy through winter.'},
-  {name:'Eastern red cedar', latin:'Juniperus virginiana', kind:'Privacy · Evergreen', goal:'privacy', light:'Full sun', water:'Low water', icon:'cedar', regions:['Northeast','Midwest','Southeast','Mountain'], desc:'A hardy, wildlife-friendly screen with year-round cover.'},
-  {name:'American arborvitae', latin:'Thuja occidentalis', kind:'Privacy · Evergreen', goal:'privacy', light:'Sun to part shade', water:'Moderate water', icon:'arborvitae', regions:['Northeast','Midwest','Northwest'], desc:'A classic dense screen; give it enough room to mature.'}
-];
-const regionAliases = {Northeast:['new england','maine','vermont','new hampshire','massachusetts','rhode island','connecticut','new york','new jersey','pennsylvania','maryland','delaware'],Midwest:['ohio','michigan','indiana','illinois','wisconsin','minnesota','iowa','missouri','north dakota','south dakota','nebraska','kansas'],Southeast:['virginia','west virginia','kentucky','tennessee','north carolina','south carolina','georgia','florida','alabama','mississippi','arkansas','louisiana','texas'],Northwest:['washington','oregon','idaho'],Mountain:['montana','wyoming','colorado','new mexico','arizona','utah','nevada']};
-const state={goal:'all',location:'',region:'',photo:false,photoUrl:'',lightClue:'',stage:0,sceneAnalysis:null,visualRender:0};
-const plantTraits={berry:{heightFt:6,establishYears:7},strawberry:{heightFt:.7,establishYears:2},blueberry:{heightFt:5,establishYears:6},coneflower:{heightFt:4,establishYears:2},susan:{heightFt:2.5,establishYears:2},bergamot:{heightFt:4,establishYears:2},inkberry:{heightFt:7,establishYears:8},cedar:{heightFt:14,establishYears:12},arborvitae:{heightFt:12,establishYears:10}};
-const sceneAspect=1.6;
+/* Fieldnote is a private, single-page garden planner. Photo analysis, local
+   plant references, and garden concepts run in this browser. */
 
-/* ------------------------------------------------------------------
-   PLANT IMAGE LIBRARY
-   Files live at assets/plants/<icon>/<stage>-<n>.webp
-   stage = young | mid | mature, n starts at 0.
-   Counts below = how many variants exist per stage. Add an entry as you
-   finish each species; anything missing falls back to the SVG drawing.
------------------------------------------------------------------- */
-const plantAssets = {
-  // Example (uncomment once the files exist):
-  // coneflower:{young:2, mid:1, mature:2},
-  // susan:{young:2, mid:1, mature:2},
+const imageFiles = {
+  serviceberry: 'Amelanchier canadensis (Canadian serviceberry).jpg',
+  allegheny: 'A21-2-Amelanchier laevis (Allegheny Serviceberry).JPG',
+  pawpaw: 'Asimina triloba 552976269.jpg',
+  strawberry: 'Fragaria virginiana - fruit.jpg',
+  blueberry: 'Blueray Blueberry Bush.JPG',
+  bergamot: 'Monarda fistulosa - Wild Bergamot (28687679226).jpg',
+  mountainmint: 'Pycnanthemum virginianum - Virginia Mountain Mint 01.jpg',
+  susan: 'Black-Eyed Susan (Rudbeckia hirta) (551be533-155d-451f-6776-38be37f4b4bc).jpg',
+  aster: 'Symphyotrichum novae-angliae NRCS-01.jpg',
+  cedar: 'Juniperus virginiana NRCS-1.jpg',
+  holly: 'American Holly (Ilex opaca) - Wyckoff, New Jersey 2023-01-15.jpg',
+  winterberry: 'Ilex verticillata 7zz.jpg',
+  viburnum: 'Viburnum dentatum 24zz.jpg'
 };
 
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const supportedImageTypes=new Set(['image/jpeg','image/png','image/webp']);
-const isSupportedImage=file=>Boolean(file&&supportedImageTypes.has(file.type.toLowerCase()));
-const toast=$('#toast');let toastTimer;
-function showToast(message){toast.textContent=message;toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove('show'),3200)}
-function detectRegion(value){const v=value.trim().toLowerCase();const zip=v.match(/\b(\d{5})(?:-\d{4})?\b/);if(zip){const prefix=Number(zip[1].slice(0,3));if(prefix>=10&&prefix<=199)return 'Northeast';if(prefix>=200&&prefix<=399)return 'Southeast';if(prefix>=400&&prefix<=699)return 'Midwest';if(prefix>=700&&prefix<=799)return 'Southeast';if(prefix>=800&&prefix<=899)return 'Mountain';if(prefix>=970&&prefix<=999)return 'Northwest'}for(const [region,terms] of Object.entries(regionAliases))if(terms.some(term=>v.includes(term)))return region;const stateCode=(v.match(/(?:^|[,\s])([a-z]{2})(?:$|[,\s])/i)||[])[1]?.toUpperCase();const codes={ME:'Northeast',VT:'Northeast',NH:'Northeast',MA:'Northeast',RI:'Northeast',CT:'Northeast',NY:'Northeast',NJ:'Northeast',PA:'Northeast',MD:'Northeast',DE:'Northeast',OH:'Midwest',MI:'Midwest',IN:'Midwest',IL:'Midwest',WI:'Midwest',MN:'Midwest',IA:'Midwest',MO:'Midwest',ND:'Midwest',SD:'Midwest',NE:'Midwest',KS:'Midwest',VA:'Southeast',WV:'Southeast',KY:'Southeast',TN:'Southeast',NC:'Southeast',SC:'Southeast',GA:'Southeast',FL:'Southeast',AL:'Southeast',MS:'Southeast',AR:'Southeast',LA:'Southeast',TX:'Southeast',WA:'Northwest',OR:'Northwest',ID:'Northwest',MT:'Mountain',WY:'Mountain',CO:'Mountain',NM:'Mountain',AZ:'Mountain',UT:'Mountain',NV:'Mountain'};return codes[stateCode]||''}
-function plantArt(type){const flowers={coneflower:['#cf86b5','#814f86'],susan:['#edbb46','#75432a'],bergamot:['#c890b3','#795487']};const berries=['berry','strawberry','blueberry'].includes(type);const flower=flowers[type];let bloom='';if(flower){bloom=`<g transform="translate(160 55)" fill="${flower[0]}"><ellipse cy="-13" rx="4" ry="13"/><ellipse cy="-13" rx="4" ry="13" transform="rotate(45)"/><ellipse cy="-13" rx="4" ry="13" transform="rotate(90)"/><ellipse cy="-13" rx="4" ry="13" transform="rotate(135)"/><ellipse cy="-13" rx="4" ry="13" transform="rotate(180)"/><ellipse cy="-13" rx="4" ry="13" transform="rotate(225)"/><ellipse cy="-13" rx="4" ry="13" transform="rotate(270)"/><ellipse cy="-13" rx="4" ry="13" transform="rotate(315)"/><circle r="6" fill="${flower[1]}"/></g>`}const shrubs=type==='inkberry'||type==='cedar'||type==='arborvitae';const backdrop=berries?'#f0e9d8':flower?'#f3ebdc': '#e8eee2';let growth=shrubs?`<path d="M160 99V40 M160 65L136 78 M160 59L182 74 M160 49L146 60 M160 48L174 59" stroke="#496849" stroke-width="4" stroke-linecap="round"/><path d="M160 34L145 55L160 50L175 57Z" fill="#708f69"/>`: `<path d="M160 108V57 M160 82L137 67 M160 88L183 69 M160 72L145 58 M160 77L175 57" fill="none" stroke="#63825d" stroke-width="3" stroke-linecap="round"/><ellipse cx="142" cy="66" rx="9" ry="4" transform="rotate(25 142 66)" fill="#80986c"/><ellipse cx="179" cy="68" rx="9" ry="4" transform="rotate(-24 179 68)" fill="#82996d"/>`;
-  let fruit='';if(berries){const col=type==='blueberry'?'#6876a2':type==='strawberry'?'#d46e58':'#813f59';fruit=`<circle cx="146" cy="82" r="4" fill="${col}"/><circle cx="169" cy="84" r="4" fill="${col}"/><circle cx="157" cy="70" r="4" fill="${col}"/>`}
-  return `<svg viewBox="0 0 320 125" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="320" height="125" fill="${backdrop}"/><circle cx="255" cy="27" r="17" fill="#f3dfa0" opacity=".85"/><path d="M0 105Q80 87 162 103T320 96V125H0Z" fill="#cfdbc2"/>${growth}${fruit}${bloom}<path d="M0 115Q80 108 145 117T320 111" fill="none" stroke="#abc09b" stroke-width="1"/></svg>`;
-}
-function plantPortrait(type){
-  const palettes={berry:['#58764d','#718f59','#9f505b'],strawberry:['#61864e','#83a15c','#ca5c4b'],blueberry:['#54754c','#829764','#67759a'],coneflower:['#53754b','#86a266','#d393bb'],susan:['#55764d','#88a05c','#f0bd49'],bergamot:['#4d714a','#789360','#b58bc7'],inkberry:['#355a40','#527b4c','#283a30'],cedar:['#3e6548','#55794c','#678259'],arborvitae:['#436a4c','#658458','#7c9968']};
-  const [stem,leaf,accent]=palettes[type]||palettes.berry;
-  const shrub=['berry','blueberry','inkberry','cedar','arborvitae'].includes(type);
-  const ground=type==='strawberry';
-  let body='';
-  if(shrub&&['cedar','arborvitae'].includes(type)){
-    body=`<path d="M80 235L80 70Q80 44 93 30Q105 45 106 65L111 96L132 59Q142 46 153 50L136 99L164 83Q177 76 183 85L157 112L176 114Q188 119 184 130L151 128L168 148Q175 162 166 169L139 143L147 179Q149 193 138 197L116 161L118 207Q114 220 104 212L99 170L89 221Z" fill="${leaf}"/><path d="M101 224L103 86" stroke="${stem}" stroke-width="7"/>`;
-  }else if(shrub){
-    body=`<path d="M104 226V112" stroke="${stem}" stroke-width="7"/><g fill="${leaf}"><circle cx="85" cy="107" r="35"/><circle cx="126" cy="98" r="38"/><circle cx="72" cy="145" r="34"/><circle cx="129" cy="145" r="42"/><circle cx="101" cy="73" r="33"/></g><g fill="${accent}"><circle cx="75" cy="103" r="3"/><circle cx="126" cy="115" r="3"/><circle cx="91" cy="143" r="3"/><circle cx="139" cy="148" r="3"/><circle cx="102" cy="78" r="3"/></g>`;
-  }else if(ground){
-    body=`<path d="M87 220Q91 129 73 80M94 200Q126 129 149 74M92 176Q68 129 46 121M96 156Q123 134 154 132" fill="none" stroke="${stem}" stroke-width="6" stroke-linecap="round"/><g fill="${leaf}"><path d="M69 104Q35 63 55 52Q82 57 84 89Q94 60 114 64Q122 91 91 111Q125 106 131 128Q108 151 86 124Q92 159 68 165Q45 146 69 119Q36 133 28 114Q40 91 69 104Z"/><path d="M141 102Q108 62 127 51Q151 58 153 87Q162 59 183 64Q190 90 160 108Q194 104 200 125Q178 148 155 122Q162 157 138 162Q115 144 140 117Q106 131 99 112Q112 90 141 102Z"/></g><path d="M68 129L57 155 M151 123L165 149" stroke="${accent}" stroke-width="9" stroke-linecap="round"/>`;
-  }else{
-    const color=type==='coneflower'?'#794f80':type==='susan'?'#805835':'#695282';
-    const petals=type==='susan'?'#edbd4e':type==='coneflower'?'#cc8bb3':'#b18ac4';
-    let blooms='';
-    const centers=type==='coneflower'?[[78,77],[130,54],[106,110]]:[[77,62],[130,82],[104,45]];
-    centers.forEach(([x,y])=>{blooms+=`<g transform="translate(${x} ${y})" fill="${petals}"><ellipse cy="-19" rx="6" ry="17"/><ellipse cy="-19" rx="6" ry="17" transform="rotate(45)"/><ellipse cy="-19" rx="6" ry="17" transform="rotate(90)"/><ellipse cy="-19" rx="6" ry="17" transform="rotate(135)"/><circle r="8" fill="${color}"/></g>`});
-    body=`<path d="M100 236Q101 180 77 97M101 230Q119 153 131 83M102 205Q73 161 55 149M105 188Q140 157 162 151" fill="none" stroke="${stem}" stroke-width="5" stroke-linecap="round"/><g fill="${leaf}"><ellipse cx="66" cy="160" rx="20" ry="8" transform="rotate(32 66 160)"/><ellipse cx="140" cy="171" rx="21" ry="8" transform="rotate(-26 140 171)"/><ellipse cx="89" cy="197" rx="19" ry="7" transform="rotate(28 89 197)"/></g>${blooms}`;
+const plants = [
+  {
+    id: 'serviceberry', name: 'Serviceberry', latin: 'Amelanchier canadensis',
+    category: 'fruit', kind: 'Edible fruit · Native shrub/tree', form: 'shrub',
+    light: 'Sun to part shade', water: 'Low to moderate water', heightFt: 18, widthFt: 12,
+    description: 'White spring bloom, summer berries, and red-orange fall color. A small native tree with three seasons of interest.',
+    credit: 'Robert H. Mohlenbrock · USDA NRCS · public domain', license: 'Public domain', licenseUrl: 'https://creativecommons.org/publicdomain/mark/1.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:Amelanchier_canadensis_(Canadian_serviceberry).jpg'
+  },
+  {
+    id: 'allegheny', name: 'Allegheny serviceberry', latin: 'Amelanchier laevis',
+    category: 'fruit', kind: 'Edible fruit · Native small tree', form: 'shrub',
+    light: 'Sun to part shade', water: 'Low to moderate water', heightFt: 25, widthFt: 15,
+    description: 'A small flowering tree with edible early-summer berries and excellent fall color. Birds may reach the fruit first.',
+    credit: 'Sherief Saleh · CC BY-SA 3.0', license: 'CC BY-SA 3.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/3.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:A21-2-Amelanchier_laevis_(Allegheny_Serviceberry).JPG'
+  },
+  {
+    id: 'pawpaw', name: 'Pawpaw', latin: 'Asimina triloba',
+    category: 'fruit', kind: 'Edible fruit · Native understory tree', form: 'shrub',
+    light: 'Part shade to sun', water: 'Moderate water', heightFt: 20, widthFt: 15,
+    description: 'Large tropical-tasting fruit grows on a small native tree. Plant two genetically different trees for reliable pollination.',
+    credit: 'Alex Abair · CC BY 4.0', license: 'CC BY 4.0', licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:Asimina_triloba_552976269.jpg'
+  },
+  {
+    id: 'blueberry', name: 'Highbush blueberry', latin: 'Vaccinium corymbosum',
+    category: 'fruit', kind: 'Edible fruit · Shrub', form: 'shrub',
+    light: 'Full sun', water: 'Regular water', heightFt: 6, widthFt: 5,
+    description: 'Spring flowers, summer berries, and vivid fall foliage. Best fruiting in sun and acidic, evenly moist soil.',
+    credit: 'OHWiki · public domain dedication', license: 'Public domain', licenseUrl: 'https://creativecommons.org/publicdomain/mark/1.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:Blueray_Blueberry_Bush.JPG'
+  },
+  {
+    id: 'strawberry', name: 'Wild strawberry', latin: 'Fragaria virginiana',
+    category: 'fruit', kind: 'Edible fruit · Groundcover', form: 'groundcover',
+    light: 'Sun to part shade', water: 'Moderate water', heightFt: 1, widthFt: 3,
+    description: 'A low, spreading native with spring flowers and small sweet fruits. Let runners fill a sunny bed edge.',
+    credit: 'Sebaz · CC BY-SA 4.0', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:Fragaria_virginiana_-_fruit.jpg'
+  },
+  {
+    id: 'bergamot', name: 'Wild bergamot', latin: 'Monarda fistulosa',
+    category: 'flowers', kind: 'Pollinator flower · Native perennial', form: 'perennial',
+    light: 'Sun to part shade', water: 'Low to moderate water', heightFt: 4, widthFt: 2,
+    description: 'Fragrant lavender blooms draw native bees and butterflies through summer. Give the clump room to spread.',
+    credit: 'N. Lewis · Shenandoah National Park', license: 'Public domain', licenseUrl: 'https://creativecommons.org/publicdomain/mark/1.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:Monarda_fistulosa_-_Wild_Bergamot_(28687679226).jpg'
+  },
+  {
+    id: 'mountainmint', name: 'Common mountain mint', latin: 'Pycnanthemum virginianum',
+    category: 'flowers', kind: 'Pollinator flower · Native perennial', form: 'perennial',
+    light: 'Sun to part shade', water: 'Moderate water', heightFt: 3, widthFt: 3,
+    description: 'Clusters of small white blooms are a magnet for native bees and beneficial insects. Spreads into a fragrant, easy-care clump.',
+    credit: 'Jasper Shide · CC0', license: 'CC0 1.0', licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:Pycnanthemum_virginianum_-_Virginia_Mountain_Mint_01.jpg'
+  },
+  {
+    id: 'susan', name: 'Black-eyed Susan', latin: 'Rudbeckia hirta',
+    category: 'flowers', kind: 'Pollinator flower · Native perennial', form: 'perennial',
+    light: 'Full sun', water: 'Low water', heightFt: 2.5, widthFt: 1.5,
+    description: 'Golden summer flowers are easy to grow and useful to pollinators. Often short-lived; allow some seed to set.',
+    credit: 'NPS Photo · public domain', license: 'Public domain', licenseUrl: 'https://creativecommons.org/publicdomain/mark/1.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:Black-Eyed_Susan_(Rudbeckia_hirta)_(551be533-155d-451f-6776-38be37f4b4bc).jpg'
+  },
+  {
+    id: 'aster', name: 'New England aster', latin: 'Symphyotrichum novae-angliae',
+    category: 'flowers', kind: 'Pollinator flower · Native perennial', form: 'perennial',
+    light: 'Full sun', water: 'Moderate water', heightFt: 5, widthFt: 2,
+    description: 'Purple fall flowers extend nectar into the late season. Pinch in early summer for a shorter, fuller plant.',
+    credit: 'Robert H. Mohlenbrock · USDA SCS', license: 'Public domain', licenseUrl: 'https://creativecommons.org/publicdomain/mark/1.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:Symphyotrichum_novae-angliae_NRCS-01.jpg'
+  },
+  {
+    id: 'cedar', name: 'Eastern red cedar', latin: 'Juniperus virginiana',
+    category: 'privacy', kind: 'Privacy · Native evergreen', form: 'conifer',
+    light: 'Full sun', water: 'Low water once established', heightFt: 30, widthFt: 15,
+    description: 'A durable evergreen screen with wildlife value. Allow generous mature spacing and avoid crowding overhead wires.',
+    credit: 'USDA NRCS · public domain', license: 'Public domain', licenseUrl: 'https://creativecommons.org/publicdomain/mark/1.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:Juniperus_virginiana_NRCS-1.jpg'
+  },
+  {
+    id: 'holly', name: 'American holly', latin: 'Ilex opaca',
+    category: 'privacy', kind: 'Privacy · Native evergreen', form: 'conifer',
+    light: 'Sun to part shade', water: 'Moderate water', heightFt: 30, widthFt: 18,
+    description: 'A broad, evergreen native screen with wildlife value. Use a male and female plant to support berries and leave room for its mature spread.',
+    credit: 'Ryan Hodnett · CC BY-SA 4.0', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:American_Holly_(Ilex_opaca)_-_Wyckoff,_New_Jersey_2023-01-15.jpg'
+  },
+  {
+    id: 'winterberry', name: 'Winterberry holly', latin: 'Ilex verticillata',
+    category: 'privacy', kind: 'Privacy · Native deciduous shrub', form: 'shrub',
+    light: 'Sun to part shade', water: 'Moist soil', heightFt: 10, widthFt: 8,
+    description: 'A multi-stem shrub with vivid winter berries and useful seasonal screening. Plant a compatible male nearby for fruit.',
+    credit: 'David J. Stang · CC BY-SA 4.0', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:Ilex_verticillata_7zz.jpg'
+  },
+  {
+    id: 'viburnum', name: 'Arrowwood viburnum', latin: 'Viburnum dentatum',
+    category: 'privacy', kind: 'Privacy · Native deciduous shrub', form: 'shrub',
+    light: 'Sun to part shade', water: 'Moderate water', heightFt: 10, widthFt: 8,
+    description: 'A dense, adaptable native hedge with spring flowers and berries for birds. Use several plants for a leafy screen.',
+    credit: 'David J. Stang · CC BY-SA 4.0', license: 'CC BY-SA 4.0', licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+    source: 'https://commons.wikimedia.org/wiki/File:Viburnum_dentatum_24zz.jpg'
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 210 250"><ellipse cx="105" cy="238" rx="58" ry="7" fill="#304b3824"/>${body}<path d="M36 238H174" stroke="#718a55" stroke-width="3" stroke-linecap="round"/></svg>`;
-}
-function getPlants(){let list=plants.filter(p=>state.goal==='all'||p.goal===state.goal);if(state.region){const local=list.filter(p=>p.regions.includes(state.region));if(local.length)list=local;else list=list.slice(0,6)}if(state.lightClue==='shadier')list.sort((a,b)=>Number(b.light==='Sun to part shade')-Number(a.light==='Sun to part shade'));return list.slice(0,6)}
-function render(){const list=getPlants();$('#plantGrid').innerHTML=list.map(p=>`<article class="plant-card"><div class="plant-art">${plantArt(p.icon)}<span class="sun-pill">☼ ${p.light}</span></div><div class="plant-info"><div class="plant-kind">${p.kind}</div><div class="plant-name">${p.name}</div><div class="plant-desc">${p.desc}</div><div class="plant-meta"><span>♧ ${p.water}</span><span>${p.latin}</span></div></div></article>`).join('');const labels={all:'All goals',fruit:'Fruits & food',flowers:'Flowers & pollinators',privacy:'Privacy & screening'};$('#filterLabel span').textContent=labels[state.goal];$('#resultsSubtitle').textContent=state.region?`A first look at plants suited to the ${state.region}${state.photo?` and your ${state.lightClue==='shadier'?'darker':'brighter'} photo` :''}. Check sun, soil, and local planting guidance before you choose.`:'A thoughtfully chosen mix for your garden. Add a location to make these recommendations local.';if(!list.length)$('#plantGrid').innerHTML='<p>No suggestions for that goal yet. Try another goal.</p>';if(!$('#visualizer').classList.contains('hidden'))renderVisualizer()}
-const growthStages=[{name:'Today',badge:'TODAY',years:0,description:'New planting day. Small starts settle into the spots estimated from your photo.'},{name:'1 year',badge:'AFTER 1 YEAR',years:1,description:'Fast-growing perennials fill in first; slower shrubs establish at their own pace.'},{name:'3 years',badge:'AFTER 3 YEARS',years:3,description:'Perennials approach mature size while fruiting and screening shrubs continue to fill out.'},{name:'5 years',badge:'AFTER 5 YEARS',years:5,description:'A more established layout, with each plant scaled by its typical mature height.'}];
+];
 
-/* ------------------------------------------------------------------
-   IMAGE LOADING (real cutouts first, SVG fallback)
------------------------------------------------------------------- */
-function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src=src})}
-const imgCache=new Map();
-function svgFallback(icon){
-  const svg=plantPortrait(icon).replace('<svg ','<svg width="840" height="1000" ');
-  return loadImage(`data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`);
+const demos = {
+  '07054': { id: 'parsippany', name: 'Parsippany–Troy Hills, NJ', badge: 'Parsippany · 07054', region: 'North Jersey · Mid-Atlantic' },
+  '20420': { id: 'washington', name: 'Washington, DC', badge: 'Washington, DC demo · 20420', region: 'Washington, DC · Mid-Atlantic' }
+};
+
+const plantsByDemo = {
+  parsippany: ['serviceberry', 'blueberry', 'strawberry', 'bergamot', 'susan', 'aster', 'cedar', 'holly', 'viburnum'],
+  washington: ['allegheny', 'blueberry', 'pawpaw', 'mountainmint', 'susan', 'aster', 'holly', 'winterberry', 'viburnum']
+};
+
+const growthStages = [
+  { name: 'Today', years: 0, description: 'New transplants. Each plant begins in an open spot estimated from your garden photo.' },
+  { name: '1 year', years: 1, description: 'Perennials fill in quickly. Woody plants stay modest while their roots establish.' },
+  { name: '3 years', years: 3, description: 'Flowering clumps widen, groundcover spreads, and shrubs gain more height and canopy.' },
+  { name: '5 years', years: 5, description: 'An established concept with different mature forms and spacing for each recommended species.' }
+];
+
+const $ = function (selector) { return document.querySelector(selector); };
+const $$ = function (selector) { return Array.from(document.querySelectorAll(selector)); };
+const allowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const state = {
+  goal: 'all', location: '07054', demo: demos['07054'], region: 'North Jersey · Mid-Atlantic',
+  photoUrl: '', photoName: '', analysis: null, lightClue: '', stage: 0, renderId: 0
+};
+const canvasAspect = 1.66;
+const maskedPlantCache = new Map();
+const plantImageCache = new Map();
+let toastTimer = 0;
+let photoLoadId = 0;
+
+function showToast(message) {
+  const toast = $('#toast');
+  toast.textContent = message;
+  toast.classList.add('show');
+  window.clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(function () { toast.classList.remove('show'); }, 3200);
 }
-function pickStage(icon,stageKey){
-  const counts=plantAssets[icon];if(!counts)return null;
-  for(const key of [stageKey,'mature','mid','young'])if(counts[key]>0)return key;
-  return null;
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, function (character) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character];
+  });
 }
-function imageForPlant(icon,stageKey='mature',variant=0){
-  const usable=pickStage(icon,stageKey);
-  const count=usable?plantAssets[icon][usable]:0;
-  const key=usable?`${icon}|${usable}|${variant%count}`:`${icon}|svg`;
-  if(!imgCache.has(key)){
-    const p=usable
-      ?loadImage(`assets/plants/${icon}/${usable}-${variant%count}.webp`).catch(()=>svgFallback(icon))
-      :svgFallback(icon);
-    imgCache.set(key,p);
+
+function normalizeZip(value) {
+  const match = String(value).match(/(?:^|\b)(\d{5})(?:-\d{4})?(?:\b|$)/);
+  return match ? match[1] : '';
+}
+
+function findDemo(value) {
+  const zip = normalizeZip(value);
+  if (demos[zip]) return { zip: zip, demo: demos[zip] };
+  const normalized = String(value).toLowerCase();
+  if (normalized.includes('parsippany')) return { zip: '07054', demo: demos['07054'] };
+  if (normalized.includes('washington') || normalized.includes('district of columbia')) return { zip: '20420', demo: demos['20420'] };
+  return { zip: zip, demo: null };
+}
+
+function detectBroadRegion(value) {
+  const text = String(value).toLowerCase();
+  const zip = normalizeZip(value);
+  if (zip && zip.startsWith('0')) return 'Northeast';
+  if (text.includes('new jersey') || text.includes(', nj') || /\bnj\b/.test(text)) return 'Northeast';
+  if (text.includes('washington') || /\bdc\b/.test(text)) return 'Mid-Atlantic';
+  if (text.includes('maryland') || /\bmd\b/.test(text) || text.includes('pennsylvania') || /\bpa\b/.test(text)) return 'Mid-Atlantic';
+  return '';
+}
+
+function setLocation(value) {
+  const trimmed = String(value || '').trim();
+  const match = findDemo(trimmed);
+  state.location = trimmed;
+  state.demo = match.demo;
+  state.region = match.demo ? match.demo.region : detectBroadRegion(trimmed);
+  if (match.demo) $('#locationInput').value = match.zip;
+  updateLocationDisplay();
+  renderPlants();
+}
+
+function updateLocationDisplay() {
+  const badge = $('#regionBadge');
+  const hint = $('#locationHint');
+  if (state.demo) {
+    badge.textContent = state.demo.badge;
+    hint.textContent = state.demo.id === 'washington'
+      ? 'For this demo, 20420 is mapped to Washington, DC · matched on this device'
+      : 'Parsippany-area native starter list · matched on this device';
+  } else if (state.location && state.region) {
+    badge.textContent = state.region + ' · broad match';
+    hint.textContent = 'Broad regional match only. Enter 07054 or 20420 for the local demo recommendations.';
+  } else if (state.location) {
+    badge.textContent = 'Location not matched';
+    hint.textContent = 'Try the Parsippany demo at 07054 or Washington, DC at 20420.';
+  } else {
+    badge.textContent = 'Choose a demo location';
+    hint.textContent = 'Enter 07054 or 20420. ZIP matching happens on this device.';
   }
-  return imgCache.get(key);
+  $$('.demo-chip').forEach(function (button) {
+    button.classList.toggle('selected', button.dataset.zip === (state.demo ? normalizeZip($('#locationInput').value) : ''));
+  });
 }
 
-/* ------------------------------------------------------------------
-   PHOTO ANALYSIS
------------------------------------------------------------------- */
-function drawPhotoCover(ctx,image,width,height){const target=width/height,imageAspect=image.naturalWidth/image.naturalHeight;let sx=0,sy=0,sw=image.naturalWidth,sh=image.naturalHeight;if(imageAspect>target){sw=image.naturalHeight*target;sx=(image.naturalWidth-sw)/2}else{sh=image.naturalWidth/target;sy=(image.naturalHeight-sh)/2}ctx.drawImage(image,sx,sy,sw,sh,0,0,width,height)}
-function groundPixelScore(r,g,b){if(g>55&&g>r*1.08&&g>b*1.04)return 1;if(r>72&&r>g*1.08&&g>b*1.04&&b<175)return .55;return 0}
-const DEFAULT_TINT={r:120,g:130,b:100}, DEFAULT_SKEW=.35;
-function analyzeGardenPhoto(image){
-  const width=160,height=100,sample=document.createElement('canvas');sample.width=width;sample.height=height;
-  const ctx=sample.getContext('2d',{willReadFrequently:true});
-  if(!ctx)return{groundTop:.62,confidence:0,columns:[],tint:DEFAULT_TINT,skew:DEFAULT_SKEW};
-  drawPhotoCover(ctx,image,width,height);
-  const pixels=ctx.getImageData(0,0,width,height).data,rowScore=new Array(height).fill(0);
-  let greens=0,total=width*height,brightness=0,sr=0,sg=0,sb=0,leftB=0,rightB=0;
-  for(let y=0;y<height;y++){
-    let score=0;
-    for(let x=0;x<width;x++){
-      const i=(y*width+x)*4,r=pixels[i],g=pixels[i+1],b=pixels[i+2];
-      score+=groundPixelScore(r,g,b);
-      if(g>r*1.08&&g>b*1.04&&g>55)greens++;
-      const lum=(.2126*r+.7152*g+.0722*b)/255;
-      brightness+=lum;
-      sr+=r;sg+=g;sb+=b;
-      if(x<width/2)leftB+=lum;else rightB+=lum;
+function currentPlants() {
+  const ids = state.demo ? plantsByDemo[state.demo.id] || [] : [];
+  const available = ids.map(function (id) {
+    return plants.find(function (plant) { return plant.id === id; });
+  }).filter(Boolean);
+  if (state.goal === 'all') return available;
+  return available.filter(function (plant) { return plant.category === state.goal; });
+}
+
+function getPhotoUrl(plant) {
+  return 'assets/plants/' + encodeURIComponent(imageFiles[plant.id]);
+}
+
+function renderPlants() {
+  const list = currentPlants();
+  const goalNames = { all: 'all goals', fruit: 'fruit and food', flowers: 'flowers and pollinators', privacy: 'privacy and screening' };
+  const locationText = state.demo ? state.demo.name : (state.region || 'your location');
+  $('#plantsTitle').textContent = state.goal === 'all' ? 'Plants for your patch' : titleCase(goalNames[state.goal]);
+  $('#resultsSubtitle').textContent = state.demo
+    ? 'Locally native starter plants for ' + locationText + ', filtered for ' + goalNames[state.goal] + '. Check each card for light, water, mature size, and planting notes.'
+    : 'Choose a demo location to see the complete verified native starter set for fruit, flowers, and privacy.';
+
+  if (!list.length) {
+    $('#plantGrid').innerHTML = '<div class="no-plants">Choose Parsippany 07054 or Washington, DC 20420 to load local native plant ideas.</div>';
+    return;
+  }
+
+  $('#plantGrid').innerHTML = list.map(function (plant) {
+    const photo = getPhotoUrl(plant);
+    return '<article class="plant-card">' +
+      '<div class="plant-photo"><img src="' + escapeHtml(photo) + '" alt="Real reference photo of ' + escapeHtml(plant.name) + ' (' + escapeHtml(plant.latin) + ')" loading="lazy" decoding="async" referrerpolicy="no-referrer">' +
+      '<div class="plant-photo-fallback" hidden aria-hidden="true">✿</div><span class="sun-pill">☼ ' + escapeHtml(plant.light) + '</span></div>' +
+      '<div class="plant-info"><div class="plant-kind">' + escapeHtml(plant.kind) + '</div><h3 class="plant-name">' + escapeHtml(plant.name) + '</h3><div class="plant-latin">' + escapeHtml(plant.latin) + '</div>' +
+      '<p class="plant-desc">' + escapeHtml(plant.description) + '</p><div class="plant-meta"><span>↟ ' + escapeHtml(plant.water) + '</span><span>↕ ' + plant.heightFt + ' ft × ' + plant.widthFt + ' ft mature</span></div>' +
+      '<div class="plant-photo-credit">Photo: ' + escapeHtml(plant.credit) + ' · <a href="' + escapeHtml(plant.source) + '" target="_blank" rel="noopener noreferrer">Photo source ↗</a> · <a href="' + escapeHtml(plant.licenseUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(plant.license) + '</a></div></div></article>';
+  }).join('');
+  $$('.plant-photo img').forEach(function (image) {
+    image.addEventListener('error', function () {
+      image.hidden = true;
+      image.nextElementSibling.hidden = false;
+    }, { once: true });
+  });
+}
+
+function titleCase(value) {
+  return value.split(' ').map(function (word) { return word.charAt(0).toUpperCase() + word.slice(1); }).join(' ');
+}
+
+function isSupportedImage(file) {
+  return Boolean(file && allowedImageTypes.has(String(file.type).toLowerCase()));
+}
+
+function handlePhoto(file) {
+  if (!isSupportedImage(file)) {
+    showToast('Choose a JPEG, PNG, or WebP photo.');
+    return;
+  }
+  if (file.size > 25 * 1024 * 1024) {
+    showToast('That photo is over 25 MB. Choose a smaller image to keep processing smooth.');
+    return;
+  }
+
+  const requestId = ++photoLoadId;
+  const nextUrl = URL.createObjectURL(file);
+  const image = $('#previewImg');
+  image.onload = function () {
+    if (requestId !== photoLoadId) {
+      URL.revokeObjectURL(nextUrl);
+      return;
     }
-    rowScore[y]=score/width;
-  }
-  let groundTop=.62,confidence=0;
-  for(let y=30;y<83;y++){const band=(rowScore[y]+rowScore[y+1]+rowScore[y+2]+rowScore[y+3]+rowScore[y+4])/5;if(band>.19){groundTop=y/height;confidence=band;break}}
-  const columns=[];
-  for(let x=8;x<width-8;x+=3){
-    let score=0,count=0;const from=Math.max(38,Math.floor(groundTop*height)-3);
-    for(let y=from;y<97;y++){for(let dx=-4;dx<=4;dx++){const i=(y*width+x+dx)*4;score+=groundPixelScore(pixels[i],pixels[i+1],pixels[i+2]);count++}}
-    let localTop=groundTop;
-    for(let y=Math.max(30,Math.floor(groundTop*height)-5);y<83;y++){let band=0,bandCount=0;for(let dy=0;dy<4;dy++)for(let dx=-4;dx<=4;dx++){const i=((y+dy)*width+x+dx)*4;band+=groundPixelScore(pixels[i],pixels[i+1],pixels[i+2]);bandCount++}if(band/bandCount>.28){localTop=y/height;break}}
-    columns.push({x:x/width,score:count?score/count:0,groundY:localTop});
-  }
-  // Light direction: brighter side of the photo = where light comes from, so shadows fall the other way.
-  const rawSkew=clamp((rightB-leftB)/(total/2)*3,-.9,.9);
-  const skew=Math.abs(rawSkew)<.15?DEFAULT_SKEW:rawSkew;
-  return{
-    groundTop,confidence,columns,
-    brightness:brightness/total,greenRatio:greens/total,
-    tint:{r:Math.round(sr/total),g:Math.round(sg/total),b:Math.round(sb/total)},
-    skew
+    if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
+    state.photoUrl = nextUrl;
+    state.photoName = file.name || 'Pasted garden photo';
+    state.analysis = analyzeGardenPhoto(image);
+    state.lightClue = state.analysis.brightness < 0.36 ? 'darker photo' : 'brighter photo';
+    $('#photoName').textContent = state.photoName;
+    $('#photoClue').textContent = state.lightClue + (state.analysis.greenRatio > .2 ? ' · leafy color' : '');
+    $('#uploadEmpty').classList.add('hidden');
+    $('#photoPreview').classList.remove('hidden');
+    if (!$('#visualizer').classList.contains('hidden')) renderVisualizer();
+    showToast('Photo added. Its pixels stay on this device.');
   };
+  image.onerror = function () {
+    URL.revokeObjectURL(nextUrl);
+    if (requestId === photoLoadId) showToast('This image could not be opened. Try a JPEG, PNG, or WebP photo.');
+  };
+  image.src = nextUrl;
 }
-function clamp(value,min,max){return Math.max(min,Math.min(max,value))}
-function photoAwareLayout(list,analysis){const count=list.length;if(!count)return[];const columns=analysis?.columns||[],groundTop=analysis?.groundTop??.62,chosen=[];for(let index=0;index<count;index++){const target=(index+1)/(count+1);let best={x:target,score:-Infinity,groundY:groundTop};for(const candidate of columns){if(candidate.x<target-.15||candidate.x>target+.15)continue;if(chosen.some(item=>Math.abs(item.x-candidate.x)<.145))continue;const score=candidate.score*.8-Math.abs(candidate.x-target)*.7;if(score>best.score)best={x:candidate.x,score,groundY:candidate.groundY}}const x=clamp(best.x,.1,.9),nearby=columns.filter(c=>Math.abs(c.x-x)<.07),localQuality=nearby.length?nearby.reduce((sum,c)=>sum+c.score,0)/nearby.length:0,baseY=clamp(best.groundY+.27+(localQuality<.06?.02:0),.73,.96);chosen.push({x,y:baseY,quality:localQuality,index})}return chosen}
-function growthFactor(plant,stage){const trait=plantTraits[plant.icon]||{establishYears:5};const rate=2.3/trait.establishYears,years=growthStages[stage].years;return .08+.92*(1-Math.exp(-rate*years))}
-function stageKeyFor(factor){return factor<.3?'young':factor<.65?'mid':'mature'}
 
-/* ------------------------------------------------------------------
-   SCENE BUILDING + DRAWING
------------------------------------------------------------------- */
-function mulberry32(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function drawPhotoCover(context, image, width, height) {
+  const targetRatio = width / height;
+  const imageRatio = image.naturalWidth / image.naturalHeight;
+  let sourceX = 0;
+  let sourceY = 0;
+  let sourceWidth = image.naturalWidth;
+  let sourceHeight = image.naturalHeight;
+  if (imageRatio > targetRatio) {
+    sourceWidth = image.naturalHeight * targetRatio;
+    sourceX = (image.naturalWidth - sourceWidth) / 2;
+  } else {
+    sourceHeight = image.naturalWidth / targetRatio;
+    sourceY = (image.naturalHeight - sourceHeight) / 2;
+  }
+  context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, 0, 0, width, height);
+}
 
-// Seeded so the layout never reshuffles between slider moves, re-renders, or exports.
-function buildInstances(list,analysis,seed=42){
-  const anchors=photoAwareLayout(list,analysis),out=[];
-  anchors.forEach(a=>{
-    const plant=list[a.index],trait=plantTraits[plant.icon]||{heightFt:4};
-    const rand=mulberry32(seed+a.index*101);
-    const n=trait.heightFt>10?1:trait.heightFt>6?2:trait.heightFt<1?6:4;
-    for(let i=0;i<n;i++){
-      out.push({
-        plant,
-        x:clamp(a.x+(rand()-.5)*.10,.06,.94),
-        y:clamp(a.y+(rand()-.5)*.04,.70,.97),
-        scale:.85+rand()*.30,
-        flip:rand()>.5,
-        variant:Math.floor(rand()*10)
-      });
+function isGreenOrSoil(red, green, blue) {
+  if (green > 50 && green > red * 1.06 && green > blue * 1.03) return 1;
+  if (red > 75 && red > green * 1.04 && green > blue * 1.02 && blue < 185) return .55;
+  return 0;
+}
+
+function analyzeGardenPhoto(image) {
+  const width = 180;
+  const height = 112;
+  const sample = document.createElement('canvas');
+  sample.width = width;
+  sample.height = height;
+  const context = sample.getContext('2d', { willReadFrequently: true });
+  if (!context) return { groundY: .76, brightness: .5, greenRatio: 0, columns: [] };
+
+  drawPhotoCover(context, image, width, height);
+  const pixels = context.getImageData(0, 0, width, height).data;
+  let brightness = 0;
+  let greenPixels = 0;
+  let groundLine = .76;
+  const rowScores = [];
+  for (let y = 0; y < height; y += 1) {
+    let rowTotal = 0;
+    for (let x = 0; x < width; x += 1) {
+      const index = (y * width + x) * 4;
+      const red = pixels[index];
+      const green = pixels[index + 1];
+      const blue = pixels[index + 2];
+      rowTotal += isGreenOrSoil(red, green, blue);
+      if (green > red * 1.06 && green > blue * 1.03 && green > 50) greenPixels += 1;
+      brightness += (.2126 * red + .7152 * green + .0722 * blue) / 255;
+    }
+    rowScores.push(rowTotal / width);
+  }
+
+  // Use a low, persistent green/soil band as the likely planting surface.
+  for (let y = 44; y < 89; y += 1) {
+    const band = (rowScores[y] + rowScores[y + 1] + rowScores[y + 2] + rowScores[y + 3]) / 4;
+    if (band > .25) {
+      groundLine = y / height;
+      break;
+    }
+  }
+
+  const columns = [];
+  for (let x = 8; x < width - 8; x += 2) {
+    let vegetation = 0;
+    let count = 0;
+    const startY = Math.floor(groundLine * height);
+    for (let y = startY; y < height - 2; y += 3) {
+      for (let dx = -3; dx <= 3; dx += 2) {
+        const index = (y * width + x + dx) * 4;
+        vegetation += isGreenOrSoil(pixels[index], pixels[index + 1], pixels[index + 2]);
+        count += 1;
+      }
+    }
+    columns.push({ x: x / width, cover: count ? vegetation / count : 0, groundY: groundLine });
+  }
+  return { groundY: groundLine, brightness: brightness / (width * height), greenRatio: greenPixels / (width * height), columns: columns };
+}
+
+function clamp(value, minimum, maximum) {
+  return Math.max(minimum, Math.min(maximum, value));
+}
+
+function calculatePlantPositions(list, analysis) {
+  const columns = analysis ? analysis.columns : [];
+  const count = list.length;
+  const points = [];
+  for (let index = 0; index < count; index += 1) {
+    const target = (index + 1) / (count + 1);
+    let best = { x: target, cover: .5, groundY: analysis ? analysis.groundY : .76, score: -Infinity };
+    columns.forEach(function (column) {
+      if (Math.abs(column.x - target) > .16) return;
+      if (points.some(function (point) { return Math.abs(point.x - column.x) < .12; })) return;
+      const openSpaceScore = 1 - column.cover;
+      const score = openSpaceScore - Math.abs(column.x - target) * .8;
+      if (score > best.score) best = { x: column.x, cover: column.cover, groundY: column.groundY, score: score };
+    });
+    points.push({ x: clamp(best.x, .09, .91), y: clamp(best.groundY + .02, .70, .96), plant: list[index] });
+  }
+  return points;
+}
+
+function growthAmount(plant, stage) {
+  const curves = {
+    perennial: [.16, .54, .84, 1],
+    groundcover: [.2, .55, .91, 1],
+    shrub: [.13, .23, .43, .68],
+    conifer: [.08, .16, .31, .49]
+  };
+  return curves[plant.form][stage];
+}
+
+function loadImage(url) {
+  if (plantImageCache.has(url)) return plantImageCache.get(url);
+  const request = new Promise(function (resolve, reject) {
+    const image = new Image();
+    image.onload = function () { resolve(image); };
+    image.onerror = reject;
+    image.src = url;
+  });
+  plantImageCache.set(url, request);
+  return request;
+}
+
+function tracePlantShape(context, width, height, form) {
+  context.beginPath();
+  if (form === 'conifer') {
+    context.moveTo(width * .5, 0);
+    context.lineTo(width * .61, height * .16);
+    context.lineTo(width * .55, height * .16);
+    context.lineTo(width * .75, height * .34);
+    context.lineTo(width * .65, height * .33);
+    context.lineTo(width * .9, height * .56);
+    context.lineTo(width * .76, height * .54);
+    context.lineTo(width, height * .77);
+    context.lineTo(width * .64, height * .76);
+    context.lineTo(width * .62, height);
+    context.lineTo(width * .38, height);
+    context.lineTo(width * .36, height * .76);
+    context.lineTo(0, height * .77);
+    context.lineTo(width * .24, height * .54);
+    context.lineTo(width * .1, height * .56);
+    context.lineTo(width * .35, height * .33);
+    context.lineTo(width * .25, height * .34);
+    context.lineTo(width * .45, height * .16);
+    context.lineTo(width * .39, height * .16);
+  } else if (form === 'perennial') {
+    context.moveTo(width * .45, height);
+    context.quadraticCurveTo(width * .25, height * .78, width * .17, height * .6);
+    context.quadraticCurveTo(width * .06, height * .45, width * .19, height * .3);
+    context.quadraticCurveTo(width * .24, height * .07, width * .43, height * .18);
+    context.quadraticCurveTo(width * .51, height * -.03, width * .62, height * .18);
+    context.quadraticCurveTo(width * .89, height * .08, width * .83, height * .37);
+    context.quadraticCurveTo(width * 1.02, height * .56, width * .77, height * .76);
+    context.quadraticCurveTo(width * .63, height * .93, width * .57, height);
+  } else if (form === 'groundcover') {
+    context.ellipse(width * .5, height * .64, width * .5, height * .34, 0, 0, Math.PI * 2);
+  } else {
+    context.moveTo(width * .5, height);
+    context.bezierCurveTo(width * .04, height * .89, width * .02, height * .39, width * .2, height * .26);
+    context.bezierCurveTo(width * .29, height * .01, width * .48, height * .11, width * .53, height * .17);
+    context.bezierCurveTo(width * .68, height * .02, width * .96, height * .23, width * .84, height * .43);
+    context.bezierCurveTo(width * 1.02, height * .64, width * .82, height * .9, width * .5, height);
+  }
+  context.closePath();
+}
+
+function makeMaskedPlant(plant, photo) {
+  if (!photo) return null;
+  if (maskedPlantCache.has(plant.id)) return maskedPlantCache.get(plant.id);
+  const canvas = document.createElement('canvas');
+  canvas.width = 360;
+  canvas.height = 460;
+  const context = canvas.getContext('2d');
+  if (!context) return null;
+  drawPhotoCover(context, photo, canvas.width, canvas.height);
+  context.globalCompositeOperation = 'destination-in';
+  tracePlantShape(context, canvas.width, canvas.height, plant.form);
+  context.fill();
+  context.globalCompositeOperation = 'source-over';
+  maskedPlantCache.set(plant.id, canvas);
+  return canvas;
+}
+
+function drawFallbackPlant(context, plant, x, groundY, width, height) {
+  context.save();
+  context.translate(x, groundY - height);
+  context.fillStyle = plant.form === 'conifer' ? '#3d704d' : plant.category === 'flowers' ? '#67854b' : '#54784c';
+  context.beginPath();
+  tracePlantShape(context, width, height, plant.form);
+  context.fill();
+  if (plant.category === 'flowers') {
+    context.fillStyle = plant.id === 'susan' ? '#f5c74a' : '#cc91be';
+    for (let i = 0; i < 5; i += 1) {
+      context.beginPath();
+      context.arc(width * (.25 + i * .12), height * (.18 + (i % 2) * .09), width * .06, 0, Math.PI * 2);
+      context.fill();
+    }
+  }
+  context.restore();
+}
+
+function drawPlant(context, plant, photo, position, stage, sceneWidth, sceneHeight) {
+  const growth = growthAmount(plant, stage);
+  const relativeHeight = plant.form === 'conifer'
+    ? .14 + Math.min(plant.heightFt, 42) / 42 * .38
+    : plant.form === 'shrub'
+      ? .14 + Math.min(plant.heightFt, 24) / 24 * .28
+      : plant.form === 'groundcover' ? .21 : .22 + Math.min(plant.heightFt, 6) / 6 * .18;
+  const perspective = .82 + ((position.y - .70) / .26) * .2;
+  const height = sceneHeight * relativeHeight * growth * perspective;
+  const widthFloor = plant.form === 'groundcover' ? .72 : plant.form === 'perennial' ? .58 : .46;
+  const widthCeiling = plant.form === 'perennial' ? 1.12 : 1.0;
+  const matureWidthRatio = clamp(plant.widthFt / Math.max(plant.heightFt, 1), widthFloor, widthCeiling);
+  const width = Math.max(20, height * matureWidthRatio);
+  const x = position.x * sceneWidth;
+  const groundY = position.y * sceneHeight;
+  const shadowSize = width * (.48 + growth * .25);
+
+  // A soft contact shadow grounds each plant on the detected planting surface.
+  context.save();
+  context.globalAlpha = .13 + growth * .13;
+  context.fillStyle = '#18291c';
+  context.shadowColor = '#172a1c88';
+  context.shadowBlur = Math.max(4, width * .09);
+  context.beginPath();
+  context.ellipse(x + width * .04, groundY - 2, shadowSize * .5, Math.max(3, shadowSize * .11), 0, 0, Math.PI * 2);
+  context.fill();
+  context.restore();
+
+  const masked = makeMaskedPlant(plant, photo);
+  if (!masked) {
+    drawFallbackPlant(context, plant, x, groundY, width, height);
+    return;
+  }
+
+  // Later years fill out through species-specific widths and plant clusters,
+  // rather than scaling a single sticker to the same mature size.
+  const clusterOffsets = plant.form === 'perennial' && stage >= 2 ? [-.3, 0, .3] :
+    plant.form === 'groundcover' && stage >= 1 ? [-.3, .28] : [0];
+  clusterOffsets.forEach(function (offset, index) {
+    const clusterScale = clusterOffsets.length === 1 ? 1 : (index === 1 && plant.form === 'perennial' ? 1 : .68);
+    const clusterWidth = width * clusterScale;
+    const clusterHeight = height * clusterScale;
+    const clusterX = x + offset * width;
+    context.save();
+    context.globalAlpha = .91;
+    context.filter = 'saturate(.9) contrast(.97)';
+    context.drawImage(masked, clusterX - clusterWidth / 2, groundY - clusterHeight, clusterWidth, clusterHeight);
+    context.restore();
+  });
+}
+
+function getPlanPlants() {
+  const list = currentPlants();
+  if (!list.length) return [];
+  if (state.goal !== 'all') return list.slice(0, 4);
+  return ['fruit', 'flowers', 'privacy'].map(function (category) {
+    return list.find(function (plant) { return plant.category === category; });
+  }).filter(Boolean);
+}
+
+function drawPlanLabel(context, width, stage) {
+  const scale = width / 1440;
+  context.save();
+  context.font = '700 ' + (13 * scale) + 'px Arial, sans-serif';
+  context.fillStyle = '#fffdf0e8';
+  context.beginPath();
+  if (typeof context.roundRect === 'function') context.roundRect(18 * scale, 18 * scale, 168 * scale, 30 * scale, 15 * scale);
+  else context.rect(18 * scale, 18 * scale, 168 * scale, 30 * scale);
+  context.fill();
+  context.fillStyle = '#46613f';
+  context.fillText('FIELDNOTE  ·  ' + growthStages[stage].name.toUpperCase(), 31 * scale, 38 * scale);
+  context.restore();
+}
+
+function drawPhotoCredits(context, width, height, list, photos) {
+  const credited = list.filter(function (plant) { return photos[plant.id]; });
+  if (!credited.length) return;
+  const scale = width / 1440;
+  const fontSize = 9 * scale;
+  const lineHeight = 12 * scale;
+  const padding = 8 * scale;
+  const maxTextWidth = width - padding * 2;
+  const lines = [];
+  context.save();
+  context.font = fontSize + 'px Arial, sans-serif';
+  credited.forEach(function (plant) {
+    const licenseReference = plant.licenseUrl.replace(/^https?:\/\//, '');
+    const source = 'Photo: ' + plant.name + ' — ' + plant.credit + ' — ' + plant.license + ' (' + licenseReference + ') — Wikimedia Commons/File:' + encodeURIComponent(imageFiles[plant.id]) + ' — photo cropped and composited for this concept.';
+    const words = source.split(' ');
+    let line = '';
+    words.forEach(function (word) {
+      const candidate = line ? line + ' ' + word : word;
+      if (line && context.measureText(candidate).width > maxTextWidth) {
+        lines.push(line);
+        line = word;
+      } else line = candidate;
+    });
+    if (line) lines.push(line);
+  });
+  const bandHeight = lines.length * lineHeight + padding * 2;
+  context.fillStyle = 'rgba(18, 39, 29, .84)';
+  context.fillRect(0, height - bandHeight, width, bandHeight);
+  context.fillStyle = 'rgba(255,255,245,.94)';
+  context.textBaseline = 'top';
+  lines.forEach(function (line, index) {
+    context.fillText(line, padding, height - bandHeight + padding + index * lineHeight, maxTextWidth);
+  });
+  context.restore();
+}
+
+function paintGarden(context, width, height, photo, list, stage, analysis, photos) {
+  drawPhotoCover(context, photo, width, height);
+  const overlay = context.createLinearGradient(0, 0, 0, height);
+  overlay.addColorStop(0, 'rgba(23,49,36,.05)');
+  overlay.addColorStop(.58, 'rgba(27,48,33,0)');
+  overlay.addColorStop(1, 'rgba(20,46,31,.12)');
+  context.fillStyle = overlay;
+  context.fillRect(0, 0, width, height);
+  const positions = calculatePlantPositions(list, analysis).sort(function (a, b) { return a.y - b.y; });
+  positions.forEach(function (position) {
+    drawPlant(context, position.plant, photos[position.plant.id], position, stage, width, height);
+  });
+  drawPlanLabel(context, width, stage);
+  drawPhotoCredits(context, width, height, list, photos);
+}
+
+async function renderGardenCanvas() {
+  if (!state.photoUrl) return;
+  const canvas = $('#gardenCanvas');
+  const context = canvas.getContext('2d');
+  if (!context) return;
+  const renderId = ++state.renderId;
+  const width = 1440;
+  const height = Math.round(width / canvasAspect);
+  canvas.width = width;
+  canvas.height = height;
+  const list = getPlanPlants();
+  try {
+    const photoPromises = list.map(async function (plant) {
+      try { return [plant.id, await loadImage(getPhotoUrl(plant))]; }
+      catch { return [plant.id, null]; }
+    });
+    const garden = await loadImage(state.photoUrl);
+    const plantPhotos = Object.fromEntries(await Promise.all(photoPromises));
+    if (renderId !== state.renderId) return;
+    paintGarden(context, width, height, garden, list, state.stage, state.analysis, plantPhotos);
+    canvas.setAttribute('aria-label', 'Garden concept at ' + growthStages[state.stage].name + ' with ' + list.map(function (plant) { return plant.name; }).join(', '));
+  } catch (error) {
+    if (renderId === state.renderId) showToast('Could not create the garden concept. Try another garden photo.');
+  }
+}
+
+function renderVisualizer() {
+  const stage = growthStages[state.stage];
+  $('#growthYear').textContent = stage.name;
+  $('#growthDescription').textContent = stage.description;
+  $('#growthSlider').value = state.stage;
+  $$('.growth-tick').forEach(function (button) {
+    button.classList.toggle('active', Number(button.dataset.stage) === state.stage);
+  });
+  $('#includedPlants').innerHTML = getPlanPlants().map(function (plant) {
+    return '<span class="included-plant"><span>✳</span>' + escapeHtml(plant.name) + '</span>';
+  }).join('');
+  renderGardenCanvas();
+}
+
+function bindPhotoControls() {
+  $('#choosePhoto').addEventListener('click', function () { $('#photoInput').click(); });
+  $('#changePhoto').addEventListener('click', function () { $('#photoInput').click(); });
+  $('#photoInput').addEventListener('change', function (event) {
+    if (event.target.files && event.target.files[0]) handlePhoto(event.target.files[0]);
+    event.target.value = '';
+  });
+
+  const dropOverlay = $('#dropOverlay');
+  const dropZone = $('#dropZone');
+  let dragDepth = 0;
+  function containsFile(event) {
+    return Array.from(event.dataTransfer ? event.dataTransfer.types : []).some(function (type) { return type.toLowerCase() === 'files'; });
+  }
+  document.addEventListener('dragenter', function (event) {
+    if (!containsFile(event)) return;
+    event.preventDefault();
+    dragDepth += 1;
+    dropOverlay.classList.add('active');
+    dropZone.classList.add('dragging');
+  });
+  document.addEventListener('dragover', function (event) {
+    if (!containsFile(event)) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy';
+  });
+  document.addEventListener('dragleave', function (event) {
+    if (!containsFile(event)) return;
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) {
+      dropOverlay.classList.remove('active');
+      dropZone.classList.remove('dragging');
     }
   });
-  return out.sort((a,b)=>a.y-b.y); // back to front
-}
-
-async function prepareScene(list,stage,analysis){
-  const instances=buildInstances(list,analysis);
-  const imgs=await Promise.all(instances.map(it=>{
-    const f=growthFactor(it.plant,stage);
-    return imageForPlant(it.plant.icon,stageKeyFor(f),it.variant);
-  }));
-  return{instances,imgs};
-}
-
-function drawPlantInstance(ctx,img,x,baseY,w,h,flip,scene){
-  const cw=Math.max(1,Math.ceil(w)),ch=Math.max(1,Math.ceil(h));
-
-  // tone-matched copy of the plant
-  const tinted=document.createElement('canvas');tinted.width=cw;tinted.height=ch;
-  const t=tinted.getContext('2d');
-  t.imageSmoothingEnabled=true;t.imageSmoothingQuality='high';
-  t.drawImage(img,0,0,cw,ch);
-  t.globalCompositeOperation='source-atop';
-  const {r,g,b}=scene.tint;
-  t.fillStyle=`rgba(${r},${g},${b},.13)`;t.fillRect(0,0,cw,ch);
-
-  // dark silhouette for the cast shadow
-  const sil=document.createElement('canvas');sil.width=cw;sil.height=ch;
-  const s=sil.getContext('2d');
-  s.drawImage(img,0,0,cw,ch);
-  s.globalCompositeOperation='source-atop';
-  s.fillStyle='#10190c';s.fillRect(0,0,cw,ch);
-
-  ctx.save();
-  ctx.translate(x,baseY);
-  if(flip)ctx.scale(-1,1);
-
-  // contact shadow
-  const cs=ctx.createRadialGradient(0,0,0,0,0,w*.35);
-  cs.addColorStop(0,'rgba(15,25,10,.35)');cs.addColorStop(1,'rgba(15,25,10,0)');
-  ctx.save();ctx.scale(1,.25);ctx.fillStyle=cs;
-  ctx.beginPath();ctx.arc(0,0,w*.35,0,Math.PI*2);ctx.fill();ctx.restore();
-
-  // cast shadow: flattened and skewed away from the light
-  ctx.save();
-  ctx.transform(1,0,flip?-scene.skew:scene.skew,.22,0,0);
-  ctx.globalAlpha=.26;
-  if('filter' in ctx)ctx.filter=`blur(${Math.max(2,w/120)}px)`;
-  ctx.drawImage(sil,-w/2,-h,w,h);
-  ctx.restore();
-
-  // the plant itself, base sitting on the ground point
-  ctx.drawImage(tinted,-w/2,-h,w,h);
-  ctx.restore();
-}
-
-function drawPlanBadges(ctx,width,height,stage){const scale=width/1200;ctx.save();ctx.font=`600 ${12*scale}px Arial, sans-serif`;const top=18*scale,left=18*scale;ctx.fillStyle='#ffffffdf';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(left,top,178*scale,26*scale,13*scale);else ctx.rect(left,top,178*scale,26*scale);ctx.fill();ctx.fillStyle='#4e634a';ctx.fillText('FIELDNOTE  ·  GARDEN PLAN',left+12*scale,top+17*scale);const label=growthStages[stage].badge;const labelWidth=ctx.measureText(label).width+22*scale;ctx.fillStyle='#ffffffdf';ctx.beginPath();if(ctx.roundRect)ctx.roundRect(width-left-labelWidth,top,labelWidth,26*scale,13*scale);else ctx.rect(width-left-labelWidth,top,labelWidth,26*scale);ctx.fill();ctx.fillStyle='#627557';ctx.fillText(label,width-left-labelWidth+11*scale,top+17*scale);ctx.restore()}
-
-function paintGardenPlan(ctx,width,height,photo,prep,stage,analysis){
-  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
-  drawPhotoCover(ctx,photo,width,height);
-  const shade=ctx.createLinearGradient(0,0,0,height);
-  shade.addColorStop(0,'rgba(26,51,33,.10)');shade.addColorStop(.4,'rgba(26,51,33,0)');shade.addColorStop(1,'rgba(20,43,40,.12)');
-  ctx.fillStyle=shade;ctx.fillRect(0,0,width,height);
-
-  const scene={tint:analysis?.tint||DEFAULT_TINT,skew:analysis?.skew??DEFAULT_SKEW};
-  prep.instances.forEach((it,i)=>{
-    const trait=plantTraits[it.plant.icon]||{heightFt:4},img=prep.imgs[i];
-    const persp=.76+clamp((it.y-.62)/.32,0,1)*.26;
-    const h=height*Math.min(.58,.04+trait.heightFt*.035)*growthFactor(it.plant,stage)*persp*it.scale;
-    const w=h*img.naturalWidth/img.naturalHeight; // real aspect ratio of the image
-    drawPlantInstance(ctx,img,it.x*width,it.y*height,w,h,it.flip,scene);
+  document.addEventListener('drop', function (event) {
+    if (!containsFile(event)) return;
+    event.preventDefault();
+    dragDepth = 0;
+    dropOverlay.classList.remove('active');
+    dropZone.classList.remove('dragging');
+    const files = Array.from(event.dataTransfer ? event.dataTransfer.files : []);
+    const image = files.find(isSupportedImage);
+    if (image) handlePhoto(image);
+    else showToast('Drop a JPEG, PNG, or WebP photo.');
   });
-  drawPlanBadges(ctx,width,height,stage);
+  document.addEventListener('paste', function (event) {
+    const items = Array.from(event.clipboardData ? event.clipboardData.items : []);
+    const imageItem = items.find(function (item) { return allowedImageTypes.has(item.type.toLowerCase()); });
+    const file = imageItem && imageItem.getAsFile();
+    if (file) {
+      event.preventDefault();
+      handlePhoto(file);
+    }
+  });
 }
 
-function renderGardenCanvas(){
-  const canvas=$('#gardenCanvas'),ctx=canvas.getContext('2d');if(!ctx)return;
-  const token=++state.visualRender,width=1200,height=Math.round(width/sceneAspect);
-  canvas.width=width;canvas.height=height;
-  const list=getPlants().slice(0,4);
-  Promise.all([loadImage(state.photoUrl),prepareScene(list,state.stage,state.sceneAnalysis)]).then(([photo,prep])=>{
-    if(token!==state.visualRender||state.photoUrl==='')return;
-    paintGardenPlan(ctx,width,height,photo,prep,state.stage,state.sceneAnalysis);
-    canvas.setAttribute('aria-label',`Illustrated garden plan, ${growthStages[state.stage].name}, including ${list.map(p=>p.name).join(', ')}`);
-  }).catch(()=>{if(token===state.visualRender)showToast('Could not render the garden preview from this image.')});
+function bindPlannerControls() {
+  $$('.goal-chip').forEach(function (button) {
+    button.addEventListener('click', function () {
+      $$('.goal-chip').forEach(function (chip) { chip.classList.remove('selected'); });
+      button.classList.add('selected');
+      state.goal = button.dataset.goal;
+      renderPlants();
+    });
+  });
+  $$('.demo-chip').forEach(function (button) {
+    button.addEventListener('click', function () { setLocation(button.dataset.zip); });
+  });
+  $('#locationInput').addEventListener('change', function (event) { setLocation(event.currentTarget.value); });
+  $('#locationInput').addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    setLocation(event.currentTarget.value);
+    event.currentTarget.blur();
+  });
+  $('#findPlants').addEventListener('click', function () {
+    setLocation($('#locationInput').value);
+    $('#plants').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!state.demo) showToast('Choose Parsippany 07054 or Washington, DC 20420 for the local plant demo.');
+    else showToast('Showing local native ideas for ' + state.demo.name + '.');
+  });
+  $('#visualizeButton').addEventListener('click', function () {
+    if (!state.photoUrl) {
+      showToast('Add a garden photo to build a site-aware concept.');
+      $('#photoInput').click();
+      return;
+    }
+    $('#visualizer').classList.remove('hidden');
+    renderVisualizer();
+    $('#visualizer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  $('#closeVisualizer').addEventListener('click', function () { $('#visualizer').classList.add('hidden'); });
+  $('#growthSlider').addEventListener('input', function (event) {
+    state.stage = Number(event.currentTarget.value);
+    renderVisualizer();
+  });
+  $$('.growth-tick').forEach(function (button) {
+    button.addEventListener('click', function () {
+      state.stage = Number(button.dataset.stage);
+      renderVisualizer();
+    });
+  });
+  $('#downloadVisual').addEventListener('click', downloadConcept);
 }
-function renderVisualizer(){const list=getPlants().slice(0,4),stage=growthStages[state.stage];$('#growthYear').textContent=stage.name;$('#growthDescription').textContent=stage.description;$('#growthSlider').value=state.stage;$$('.growth-tick').forEach(t=>t.classList.toggle('active',Number(t.dataset.stage)===state.stage));$('#includedPlants').innerHTML=list.map(p=>`<span class="included-plant"><span>✳</span>${p.name}</span>`).join('');renderGardenCanvas()}
-function inspectPhoto(img){try{const analysis=analyzeGardenPhoto(img);state.sceneAnalysis=analysis;state.lightClue=analysis.brightness<.37?'shadier':'brighter';$('#photoClue').textContent=`${state.lightClue==='shadier'?'Darker':'Brighter'} photo${analysis.greenRatio>.22?' · leafy color':''}`;render()}catch{state.sceneAnalysis={groundTop:.62,confidence:0,columns:[],tint:DEFAULT_TINT,skew:DEFAULT_SKEW};$('#photoClue').textContent='Photo added';state.lightClue='';render()}}
-function setLocation(value,region=''){state.location=value;state.region=region||detectRegion(value);$('#locationInput').value=value;$('#sidebarPlace').textContent=value||'Your garden';$('#sidebarClimate').textContent=state.region?`${state.region} · regional plants`:value?'Location added':'Set your location';$('#locationHint').textContent=state.region?`Showing plants suited to the ${state.region}, matched on this device.`:value?'No regional match yet. Add a state or U.S. ZIP for broad matching.':'Optional. We match broad regions on this device.';render()}
-function handlePhoto(file){if(!isSupportedImage(file)){showToast('Choose a JPEG, PNG, or WebP photo.');return}if(file.size>25*1024*1024){showToast('That image is over 25 MB. Choose a smaller photo to keep processing smooth.');return}const url=URL.createObjectURL(file),img=$('#previewImg'),previousUrl=state.photoUrl,previousName=$('#photoName').textContent,previousClue=$('#photoClue').textContent;$('#photoClue').textContent='Reading photo clues…';img.onload=()=>{if(previousUrl&&previousUrl!==url)URL.revokeObjectURL(previousUrl);state.photoUrl=url;state.photo=true;state.sceneAnalysis=null;$('#photoName').textContent=file.name||'Pasted garden photo';$('#uploadEmpty').classList.add('hidden');$('#photoPreview').classList.remove('hidden');inspectPhoto(img);showToast('Photo added. Your garden preview is ready.')};img.onerror=()=>{URL.revokeObjectURL(url);img.onload=null;img.onerror=null;if(previousUrl){img.src=previousUrl;$('#photoName').textContent=previousName;$('#photoClue').textContent=previousClue;state.photo=true;showToast('That image could not be opened. Your previous photo is still in place.')}else{state.photo=false;state.photoUrl='';$('#photoPreview').classList.add('hidden');$('#uploadEmpty').classList.remove('hidden');$('#photoClue').textContent='';showToast('This image could not be opened. Try a JPEG, PNG, or WebP photo.')}};img.src=url}
-$('#choosePhoto').addEventListener('click',()=>$('#photoInput').click());$('#changePhoto').addEventListener('click',()=>$('#photoInput').click());$('#photoInput').addEventListener('change',e=>{handlePhoto(e.target.files[0]);e.target.value='' });
-let dragDepth=0;const dropOverlay=$('#dropOverlay');function hasDraggedFile(event){return Array.from(event.dataTransfer?.types||[]).some(type=>type.toLowerCase()==='files')}document.addEventListener('dragenter',event=>{if(!hasDraggedFile(event))return;event.preventDefault();dragDepth++;dropOverlay.classList.add('active')});document.addEventListener('dragover',event=>{if(!hasDraggedFile(event))return;event.preventDefault();if(event.dataTransfer)event.dataTransfer.dropEffect='copy'});document.addEventListener('dragleave',event=>{if(!hasDraggedFile(event))return;dragDepth=Math.max(0,dragDepth-1);if(!dragDepth)dropOverlay.classList.remove('active')});document.addEventListener('drop',event=>{if(!hasDraggedFile(event))return;event.preventDefault();dragDepth=0;dropOverlay.classList.remove('active');const file=Array.from(event.dataTransfer.files||[]).find(isSupportedImage);if(file)handlePhoto(file);else showToast('Drop a JPEG, PNG, or WebP photo.')});document.addEventListener('paste',event=>{const item=Array.from(event.clipboardData?.items||[]).find(entry=>supportedImageTypes.has(entry.type.toLowerCase()));if(!item)return;const file=item.getAsFile();if(file){event.preventDefault();handlePhoto(file)}});
-$$('.goal-chip').forEach(btn=>btn.addEventListener('click',()=>{$$('.goal-chip').forEach(c=>c.classList.remove('selected'));btn.classList.add('selected');state.goal=btn.dataset.goal;render()}));
-$('#locationInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();const value=e.currentTarget.value.trim();if(value)setLocation(value);e.currentTarget.blur()}});$('#locationInput').addEventListener('change',e=>{const value=e.target.value.trim();if(value)setLocation(value)});
-$('#findPlants').addEventListener('click',()=>{render();document.querySelector('.results').scrollIntoView({behavior:'smooth',block:'start'});if(!state.photo&&!state.location)showToast('Add a photo and location for ideas tailored to your space.');else if(!state.location)showToast('Add your location to see regionally suited plants.');else if(!state.photo)showToast('Add a photo to help you think through your space.');else showToast('Your garden ideas are ready below.')});
-$('#visualizeButton').addEventListener('click',()=>{if(!state.photo){showToast('Add a garden photo first to preview your planting plan.');$('#photoInput').click();return}$('#visualizer').classList.remove('hidden');renderVisualizer();$('#visualizer').scrollIntoView({behavior:'smooth',block:'start'})});$('#closeVisualizer').addEventListener('click',()=>$('#visualizer').classList.add('hidden'));$('#growthSlider').addEventListener('input',e=>{state.stage=Number(e.target.value);renderVisualizer()});$$('.growth-tick').forEach(t=>t.addEventListener('click',()=>{state.stage=Number(t.dataset.stage);renderVisualizer()}));
 
-$('#downloadVisual').addEventListener('click',async()=>{
-  if(!state.photoUrl){showToast('Add a garden photo before saving a concept.');return}
-  try{
-    const photo=await loadImage(state.photoUrl),canvas=document.createElement('canvas');
-    canvas.width=2400;canvas.height=Math.round(canvas.width/sceneAspect);
-    const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Canvas is unavailable');
-    const list=getPlants().slice(0,4);
-    const prep=await prepareScene(list,state.stage,state.sceneAnalysis);
-    paintGardenPlan(ctx,canvas.width,canvas.height,photo,prep,state.stage,state.sceneAnalysis);
-    canvas.toBlob(blob=>{
-      if(!blob){showToast('Could not save this preview.');return}
-      const imageUrl=URL.createObjectURL(blob),link=document.createElement('a');
-      link.href=imageUrl;
-      link.download=`fieldnote-garden-${state.stage===0?'today':state.stage===1?'year-1':state.stage===2?'year-3':'year-5'}.png`;
+async function downloadConcept() {
+  if (!state.photoUrl) {
+    showToast('Add a garden photo before saving a concept.');
+    return;
+  }
+  try {
+    const list = getPlanPlants();
+    const photoEntries = await Promise.all(list.map(async function (plant) {
+      try { return [plant.id, await loadImage(getPhotoUrl(plant))]; }
+      catch { return [plant.id, null]; }
+    }));
+    const photos = Object.fromEntries(photoEntries);
+    const garden = await loadImage(state.photoUrl);
+    const canvas = document.createElement('canvas');
+    canvas.width = 2400;
+    canvas.height = Math.round(canvas.width / canvasAspect);
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas is unavailable');
+    paintGarden(context, canvas.width, canvas.height, garden, list, state.stage, state.analysis, photos);
+    canvas.toBlob(function (blob) {
+      if (!blob) {
+        showToast('Could not save this concept image. Plant photos may be blocked by the browser.');
+        return;
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'fieldnote-garden-' + growthStages[state.stage].years + '-years.png';
       link.click();
-      setTimeout(()=>URL.revokeObjectURL(imageUrl),1000);
-      showToast('Garden concept saved as an image.');
-    },'image/png');
-  }catch{showToast('Could not create the image. Try another garden photo.')}
+      window.setTimeout(function () { URL.revokeObjectURL(url); }, 1200);
+      showToast('Garden concept saved as a PNG.');
+    }, 'image/png');
+  } catch (error) {
+    showToast('Could not save the concept. Try a different photo or browser.');
+  }
+}
+
+function bindDialog() {
+  $('#howItWorks').addEventListener('click', function () { $('#infoDialog').showModal(); });
+  $('#closeDialog').addEventListener('click', function () { $('#infoDialog').close(); });
+  $('#gotIt').addEventListener('click', function () { $('#infoDialog').close(); });
+  $('#infoDialog').addEventListener('click', function (event) {
+    if (event.target === $('#infoDialog')) $('#infoDialog').close();
+  });
+}
+
+function startApp() {
+  bindPhotoControls();
+  bindPlannerControls();
+  bindDialog();
+  setLocation('07054');
+}
+
+window.addEventListener('pagehide', function () {
+  if (state.photoUrl) URL.revokeObjectURL(state.photoUrl);
 });
-window.addEventListener('pagehide',()=>{if(state.photoUrl)URL.revokeObjectURL(state.photoUrl)});
-$('#howItWorks').addEventListener('click',()=>$('#infoDialog').showModal());$('#closeDialog').addEventListener('click',()=>$('#infoDialog').close());$('#gotIt').addEventListener('click',()=>$('#infoDialog').close());$('#infoDialog').addEventListener('click',e=>{if(e.target===$('#infoDialog'))$('#infoDialog').close()});$('#sidebarLocation').addEventListener('click',()=>{$('#locationInput').focus();document.querySelector('.workspace').scrollIntoView({behavior:'smooth',block:'center'})});$('#viewAll').addEventListener('click',()=>showToast('More plant ideas are on their way. Start with these locally suited picks.'));
-render();
+
+startApp();
